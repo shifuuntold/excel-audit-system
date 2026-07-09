@@ -8,6 +8,7 @@ export function AuditProvider({ children }) {
 
         shop_name: "",
         area_id: "",
+        area_name: "",
         visit_date: new Date().toISOString().split("T")[0],
 
         person_met: "",

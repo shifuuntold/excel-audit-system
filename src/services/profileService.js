@@ -28,3 +28,16 @@ export async function getProfile(userId) {
 
     return data;
 }
+
+// id -> full_name lookup, used by the supervisor dashboard to label
+// audits by rep. Requires an RLS policy allowing supervisors to read
+// all profiles (see supabase/supervisor_setup.sql).
+export async function getProfileMap() {
+    const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, role");
+
+    if (error) throw error;
+
+    return Object.fromEntries((data || []).map((p) => [p.id, p]));
+}

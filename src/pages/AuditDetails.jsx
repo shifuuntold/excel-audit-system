@@ -1,20 +1,59 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { supabase } from "../lib/supabase";
+import { getAreaMap, resolveAreaName } from "../services/areaService";
+import { buildProductSummary } from "../utils/productSummary";
+
+import Header from "../components/layout/Header";
+import PageContainer from "../components/layout/PageContainer";
+import LoadingSpinner from "../components/common/LoadingSpinner";
+import Button from "../components/common/Button";
+import { B } from "../config/theme";
+import { FileText } from "lucide-react";
+
+function Field({ label, value }) {
+    return (
+        <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: B.muted, textTransform: "uppercase", letterSpacing: 0.4, margin: 0 }}>
+                {label}
+            </p>
+            <p style={{ fontSize: 14, color: B.text, margin: "3px 0 0", fontWeight: 500 }}>
+                {value || "-"}
+            </p>
+        </div>
+    );
+}
+
+function Section({ title, children }) {
+    return (
+        <div
+            style={{
+                background: B.white,
+                borderRadius: 16,
+                border: `1px solid ${B.blueLight}`,
+                boxShadow: "0 2px 14px rgba(0,48,135,0.07)",
+                padding: 22,
+                marginBottom: 16,
+            }}
+        >
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, color: B.blue }}>
+                {title}
+            </h2>
+            {children}
+        </div>
+    );
+}
 
 export default function AuditDetails() {
-
     const { id } = useParams();
 
     const [audit, setAudit] = useState(null);
-
+    const [areaMap, setAreaMap] = useState({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-
         async function loadAudit() {
-
             const { data, error } = await supabase
                 .from("audit_submissions")
                 .select("*")
@@ -22,156 +61,111 @@ export default function AuditDetails() {
                 .single();
 
             if (error) {
-
                 console.error(error);
-
             } else {
-
                 setAudit(data);
-
             }
-
             setLoading(false);
-
         }
 
         loadAudit();
-
+        getAreaMap().then(setAreaMap).catch(console.error);
     }, [id]);
-        if (loading) {
 
-        return (
-
-            <div className="min-h-screen flex items-center justify-center">
-
-                Loading audit...
-
-            </div>
-
-        );
-
+    if (loading) {
+        return <LoadingSpinner fullScreen label="Loading audit..." />;
     }
 
     if (!audit) {
-
         return (
-
-            <div className="min-h-screen flex items-center justify-center">
-
-                Audit not found.
-
-            </div>
-
+            <>
+                <Header title="Audit Not Found" backTo="/audits/history" />
+                <PageContainer withNav={false}>
+                    <p style={{ color: B.muted, textAlign: "center" }}>
+                        This audit could not be found.
+                    </p>
+                </PageContainer>
+            </>
         );
-
     }
 
+    const summary = buildProductSummary(audit.products);
+    const totalCount = summary.reduce((sum, g) => sum + g.count, 0);
+
     return (
+        <>
+            <Header
+                title={audit.outlet?.shop_name || "Audit Details"}
+                subtitle={new Date(audit.created_at).toLocaleString()}
+                backTo="/audits/history"
+                action={
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={FileText}
+                        onClick={async () => {
+                            const { exportAuditToPDF } = await import("../services/exportService");
+                            exportAuditToPDF(audit, areaMap);
+                        }}
+                        style={{ background: "rgba(255,255,255,0.14)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.4)" }}
+                    >
+                        PDF
+                    </Button>
+                }
+            />
 
-        <div className="min-h-screen bg-slate-100">
-
-            <div className="bg-blue-900 text-white px-8 py-6">
-
-                <h1 className="text-3xl font-bold">
-
-                    Audit Details
-
-                </h1>
-
-            </div>
-
-            <div className="max-w-5xl mx-auto p-8">
-
-                <Link
-                    to="/audits/today"
-                    className="text-blue-700 hover:underline"
-                >
-                    ← Back
-                </Link>
-                                <div className="bg-white rounded-xl shadow mt-6 p-8">
-
-                    <h2 className="text-2xl font-bold mb-6">
-
-                        Outlet Information
-
-                    </h2>
-
-                    <div className="grid md:grid-cols-2 gap-6">
-
-                        <div>
-
-                            <strong>Shop Name</strong>
-
-                            <p>{audit.outlet?.shop_name || "-"}</p>
-
-                        </div>
-
-                        <div>
-
-                            <strong>Visit Date</strong>
-
-                            <p>{audit.outlet?.visit_date || "-"}</p>
-
-                        </div>
-
-                        <div>
-
-                            <strong>Person Met</strong>
-
-                            <p>{audit.outlet?.person_met || "-"}</p>
-
-                        </div>
-
-                        <div>
-
-                            <strong>Position</strong>
-
-                            <p>{audit.outlet?.position || "-"}</p>
-
-                        </div>
-
-                        <div>
-
-                            <strong>Mobile</strong>
-
-                            <p>{audit.outlet?.mobile || "-"}</p>
-
-                        </div>
-
-                        <div>
-
-                            <strong>Area</strong>
-
-                            <p>{audit.outlet?.area_id || "-"}</p>
-
-                        </div>
-
+            <PageContainer withNav={false}>
+                <Section title="Outlet Information">
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
+                        <Field label="Shop Name" value={audit.outlet?.shop_name} />
+                        <Field label="Area" value={resolveAreaName(audit.outlet, areaMap)} />
+                        <Field label="Visit Date" value={audit.outlet?.visit_date} />
+                        <Field label="Person Met" value={audit.outlet?.person_met} />
+                        <Field label="Position" value={audit.outlet?.position} />
+                        <Field label="Mobile" value={audit.outlet?.mobile} />
+                        {audit.outlet?.latitude && (
+                            <Field label="GPS" value={`${audit.outlet.latitude}, ${audit.outlet.longitude}`} />
+                        )}
                     </div>
+                </Section>
 
-                </div>
+                <Section title="Market Information">
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
+                        <Field label="Distributor" value={audit.market?.distributor} />
+                        <Field label="Competitor" value={audit.market?.competitor} />
+                    </div>
+                </Section>
 
-                <div className="bg-white rounded-xl shadow mt-6 p-8">
+                <Section title={`Products Recorded (${totalCount})`}>
+                    {summary.length === 0 ? (
+                        <p style={{ color: B.muted, fontSize: 13, margin: 0 }}>No products recorded.</p>
+                    ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {summary.map((group) => (
+                                <div key={group.key} style={{ background: B.blueFaint, borderRadius: 12, padding: "12px 14px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                                        <span style={{ fontSize: 15 }}>{group.icon}</span>
+                                        <span style={{ fontWeight: 700, fontSize: 13, color: B.text }}>{group.label}</span>
+                                        <span style={{ fontSize: 11, color: B.muted, fontWeight: 600 }}>({group.count})</span>
+                                    </div>
+                                    <p style={{ fontSize: 12.5, color: B.muted, margin: 0, lineHeight: 1.6 }}>
+                                        {group.items.join(" · ")}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </Section>
 
-                    <h2 className="text-2xl font-bold mb-4">
-
-                        Market Information
-
-                    </h2>
-
-                    <p><strong>Distributor:</strong> {audit.market?.distributor || "-"}</p>
-
-                    <p><strong>Competitor:</strong> {audit.market?.competitor || "-"}</p>
-
-                    <p><strong>Retailer Feedback:</strong> {audit.market?.feedback || "-"}</p>
-
-                    <p><strong>Notes:</strong> {audit.market?.notes || "-"}</p>
-
-                </div>
-
-            </div>
-
-        </div>
-
+                <Section title="Feedback & Notes">
+                    <p style={{ fontSize: 13, marginBottom: 12 }}>
+                        <strong>Feedback:</strong> {audit.market?.feedback || "No feedback recorded."}
+                    </p>
+                    <p style={{ fontSize: 13, margin: 0 }}>
+                        <strong>Notes:</strong> {audit.market?.notes || "No notes recorded."}
+                    </p>
+                </Section>
+            </PageContainer>
+        </>
     );
-
 }

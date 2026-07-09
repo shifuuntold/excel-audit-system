@@ -1,34 +1,41 @@
-export default function StatCard({
-    title,
-    value,
-    subtitle,
-    icon: Icon,
-}) {
+import { B } from "../../config/theme";
+
+export default function StatCard({ title, value, subtitle, icon: Icon }) {
     return (
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-
-            <div className="flex justify-between items-start">
-
-                <div>
-
-                    <p className="text-sm text-gray-500">
-                        {title}
-                    </p>
-
-                    <h2 className="text-3xl font-bold mt-2">
-                        {value}
-                    </h2>
-
-                    <p className="text-sm text-gray-400 mt-2">
-                        {subtitle}
-                    </p>
-
-                </div>
-
-                <Icon className="w-9 h-9 text-blue-700" />
-
+        <div
+            style={{
+                background: B.white,
+                borderRadius: 16,
+                border: `1px solid ${B.blueLight}`,
+                boxShadow: "0 2px 14px rgba(0,48,135,0.07)",
+                padding: 20,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+            }}
+        >
+            <div>
+                <p style={{ fontSize: 13, color: B.muted, margin: 0 }}>{title}</p>
+                <h2 style={{ fontSize: 28, fontWeight: 700, margin: "6px 0 0", color: B.text }}>
+                    {value}
+                </h2>
+                <p style={{ fontSize: 12, color: B.muted, marginTop: 6 }}>{subtitle}</p>
             </div>
 
+            <div
+                style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: B.blueFaint,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                }}
+            >
+                <Icon size={20} style={{ color: B.blue }} />
+            </div>
         </div>
     );
 }

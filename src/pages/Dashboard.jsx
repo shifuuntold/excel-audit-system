@@ -1,133 +1,156 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { getTodaysAuditCount } from "../services/dashboardService";
+import { getDashboardStats } from "../services/dashboardService";
+import { useNavigate } from "react-router-dom";
 
 import DashboardCard from "../components/dashboard/DashboardCard";
 import StatCard from "../components/dashboard/StatCard";
-import { useNavigate } from "react-router-dom";
+import TrendChart from "../components/dashboard/TrendChart";
+import Header from "../components/layout/Header";
+import PageContainer from "../components/layout/PageContainer";
+import BottomNavigation from "../components/layout/BottomNavigation";
+import LoadingSpinner from "../components/common/LoadingSpinner";
+import { B } from "../config/theme";
 
 import {
-
     ClipboardPlus,
-    ChartColumn,
     Search,
     FileBarChart,
     ClipboardCheck,
     MapPinned,
-
+    Package,
+    TrendingUp,
 } from "lucide-react";
 
 export default function Dashboard() {
-    const { user, profile } = useAuth();
+    const { profile, user } = useAuth();
+    const navigate = useNavigate();
 
-const navigate = useNavigate();
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-const [todayCount, setTodayCount] = useState(0);
-
-useEffect(() => {
-
-    async function loadDashboard() {
-
-        if (!user) return;
-
-        try {
-
-            const count = await getTodaysAuditCount(user.id);
-
-            setTodayCount(count);
-
-        } catch (error) {
-
-            console.error(error);
-
+    useEffect(() => {
+        async function loadDashboard() {
+            if (!user) return;
+            try {
+                const data = await getDashboardStats(user.id);
+                setStats(data);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
         }
 
-    }
-
-    loadDashboard();
-
-}, [user]);
+        loadDashboard();
+    }, [user]);
 
     return (
-        <div className="min-h-screen bg-slate-100">
+        <>
+            <Header title="Excel Chemicals" subtitle="Field Sales Audit System" />
 
-            <div className="bg-blue-900 text-white px-8 py-6 shadow">
+            <PageContainer>
+                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>
+                    Welcome back, {profile.full_name} 👋
+                </h2>
 
-                <h1 className="text-3xl font-bold">
-                    Excel Chemicals
-                </h1>
+                {loading ? (
+                    <LoadingSpinner label="Loading your stats..." />
+                ) : (
+                    <>
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                                gap: 16,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <StatCard
+                                title="Today's Audits"
+                                value={stats.todayCount}
+                                subtitle={`${stats.weekCount} this week · ${stats.monthCount} this month`}
+                                icon={ClipboardCheck}
+                            />
 
-                <p className="text-blue-200">
-                    Field Sales Audit System
-                </p>
+                            <StatCard
+                                title="Areas Covered Today"
+                                value={stats.areasCoveredToday}
+                                subtitle={
+                                    stats.topArea
+                                        ? `Top this month: ${stats.topArea.name}`
+                                        : "No visits yet this month"
+                                }
+                                icon={MapPinned}
+                            />
 
-            </div>
+                            <StatCard
+                                title="Products Logged Today"
+                                value={stats.productsRecordedToday}
+                                subtitle="Across all today's outlets"
+                                icon={Package}
+                            />
+                        </div>
 
-            <h2 className="text-3xl font-bold mb-8">
+                        <div
+                            style={{
+                                background: B.white,
+                                borderRadius: 16,
+                                border: `1px solid ${B.blueLight}`,
+                                boxShadow: "0 2px 14px rgba(0,48,135,0.07)",
+                                padding: 20,
+                                marginBottom: 28,
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                                <TrendingUp size={16} style={{ color: B.blue }} />
+                                <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: B.text }}>
+                                    Last 7 Days
+                                </h3>
+                            </div>
+                            <TrendChart data={stats.last7Days} />
+                        </div>
+                    </>
+                )}
 
-    Welcome back, {profile.full_name} 👋
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                        gap: 16,
+                    }}
+                >
+                    <DashboardCard
+                        title="New Audit"
+                        description="Start a new outlet inspection."
+                        icon={ClipboardPlus}
+                        onClick={() => navigate("/audit/new")}
+                    />
 
-</h2>
+                    <DashboardCard
+                        title="Audit History"
+                        description="Search and filter past audits."
+                        icon={Search}
+                        onClick={() => navigate("/audits/history")}
+                    />
 
-<div className="grid lg:grid-cols-3 gap-6 mb-10">
+                    <DashboardCard
+                        title="Today's Audits"
+                        description="View today's completed audits."
+                        icon={ClipboardCheck}
+                        onClick={() => navigate("/audits/history")}
+                    />
 
-    <StatCard
-        title="Today's Audits"
-        value="{todayCount}"
-        subtitle={
-            todayCount === 1
-                ? "1 audit submitted today"
-                : `${todayCount} audits submitted today`
-    }
-        icon={ClipboardCheck}
-    />
+                    <DashboardCard
+                        title="Reports"
+                        description="Export availability and sales reports."
+                        icon={FileBarChart}
+                        onClick={() => navigate("/audits/history")}
+                    />
+                </div>
+            </PageContainer>
 
-    <StatCard
-        title="Areas Covered"
-        value="0"
-        subtitle="Today's visits"
-        icon={MapPinned}
-    />
-
-    <StatCard
-        title="Pending Sync"
-        value="0"
-        subtitle="Ready to upload"
-        icon={ChartColumn}
-    />
-
-</div>
-
-<div className="grid md:grid-cols-2 gap-6">
-
-    <DashboardCard
-        title="New Audit"
-        description="Start a new outlet inspection."
-        icon={ClipboardPlus}
-        onClick={() => navigate("/audit/new")}
-    />
-
-    <DashboardCard
-        title="Today's Audits"
-        description="View today's completed audits."
-        icon={ClipboardCheck}
-        onClick={() => navigate("/audits/today")}
-    />
-
-    <DashboardCard
-        title="Search Outlets"
-        description="Search previously audited outlets."
-        icon={Search}
-    />
-
-    <DashboardCard
-        title="Reports"
-        description="View availability and sales reports."
-        icon={FileBarChart}
-    />
-
-</div>
-
-        </div>
+            <BottomNavigation />
+        </>
     );
 }

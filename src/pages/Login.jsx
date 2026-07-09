@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { B } from "../config/theme";
+import Button from "../components/common/Button";
+import Input from "../components/common/Input";
+import ErrorMessage from "../components/common/ErrorMessage";
 
 export default function Login() {
-
     const navigate = useNavigate();
 
     const [email, setEmail] = useState("");
@@ -12,94 +15,80 @@ export default function Login() {
     const [error, setError] = useState("");
 
     async function handleLogin(e) {
-
         e.preventDefault();
-
         setLoading(true);
         setError("");
 
-        const { error } =
-            await supabase.auth.signInWithPassword({
-
-                email,
-                password,
-
-            });
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
 
         setLoading(false);
 
         if (error) {
-
             setError(error.message);
-
             return;
-
         }
 
         navigate("/dashboard");
-
     }
 
     return (
-
-        <div className="min-h-screen flex items-center justify-center bg-slate-100">
-
+        <div
+            style={{
+                minHeight: "100vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: `linear-gradient(135deg, ${B.blue} 0%, ${B.blueMid} 100%)`,
+                padding: 20,
+            }}
+        >
             <form
                 onSubmit={handleLogin}
-                className="bg-white p-10 rounded-xl shadow-xl w-96"
+                style={{
+                    background: B.white,
+                    padding: 40,
+                    borderRadius: 20,
+                    boxShadow: "0 20px 50px rgba(0,48,135,0.25)",
+                    width: "100%",
+                    maxWidth: 380,
+                }}
             >
-
-                <h1 className="text-3xl font-bold text-center mb-2">
-
-                    Excel Audit
-
-                </h1>
-
-                <p className="text-center text-gray-500 mb-8">
-
-                    Sign in
-
-                </p>
-
-                <input
-                    type="email"
-                    placeholder="Email"
-                    className="w-full border rounded-lg p-3 mb-4"
-                    value={email}
-                    onChange={(e)=>setEmail(e.target.value)}
-                />
-
-                <input
-                    type="password"
-                    placeholder="Password"
-                    className="w-full border rounded-lg p-3 mb-4"
-                    value={password}
-                    onChange={(e)=>setPassword(e.target.value)}
-                />
-
-                {error && (
-
-                    <p className="text-red-600 mb-4">
-
-                        {error}
-
+                <div style={{ textAlign: "center", marginBottom: 28 }}>
+                    <h1 style={{ fontSize: 26, fontWeight: 700, color: B.blue, margin: 0 }}>
+                        Excel Chemicals
+                    </h1>
+                    <p style={{ color: B.muted, marginTop: 6, fontSize: 14 }}>
+                        Field Sales Audit System
                     </p>
+                </div>
 
-                )}
+                <ErrorMessage>{error}</ErrorMessage>
 
-                <button
-                    disabled={loading}
-                    className="w-full bg-blue-700 text-white p-3 rounded-lg"
-                >
+                <Input
+                    label="Email"
+                    type="email"
+                    placeholder="you@excelchemicals.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                />
 
-                    {loading ? "Signing in..." : "Login"}
+                <Input
+                    label="Password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                />
 
-                </button>
-
+                <Button type="submit" variant="primary" fullWidth loading={loading} size="lg">
+                    {loading ? "Signing in..." : "Sign In"}
+                </Button>
             </form>
-
         </div>
-
     );
-
 }
