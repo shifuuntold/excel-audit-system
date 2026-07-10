@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { getAreas } from "../../services/areaService";
+import { useState } from "react";
 import { useAudit } from "../../contexts/AuditContext";
 import { POSITIONS } from "../../config/productCatalog";
 
@@ -8,6 +7,7 @@ import CardTitle from "../common/CardTitle";
 import Input from "../common/Input";
 import Select from "../common/Select";
 import Button from "../common/Button";
+import LocationSearch from "./LocationSearch";
 import { B } from "../../config/theme";
 import { LocateFixed, CheckCircle2 } from "lucide-react";
 
@@ -15,33 +15,13 @@ export default function OutletForm() {
 
     const { audit, setAudit } = useAudit();
 
-    const [areas, setAreas] = useState([]);
     const [locating, setLocating] = useState(false);
     const [locationError, setLocationError] = useState("");
-
-    useEffect(() => {
-        async function loadAreas() {
-            const list = await getAreas();
-            setAreas(list);
-        }
-        loadAreas();
-    }, []);
 
     function updateField(field, value) {
         setAudit({
             ...audit,
             [field]: value,
-        });
-    }
-
-    function handleAreaChange(areaId) {
-        const selected = areas.find((a) => String(a.id) === String(areaId));
-        setAudit({
-            ...audit,
-            area_id: areaId,
-            // snapshot the name at time of visit so history stays readable
-            // even if the area gets renamed later
-            area_name: selected?.name || "",
         });
     }
 
@@ -91,19 +71,13 @@ export default function OutletForm() {
                     placeholder="e.g. Kim's General Store"
                 />
 
-                <Select
-                    label="Area"
+                <LocationSearch
                     required
-                    placeholder="Select Area"
-                    value={audit.area_id || ""}
-                    onChange={(e) => handleAreaChange(e.target.value)}
-                >
-                    {areas.map((area) => (
-                        <option key={area.id} value={area.id}>
-                            {area.name}
-                        </option>
-                    ))}
-                </Select>
+                    value={audit.area_name || ""}
+                    onSelect={({ area_id, area_name }) =>
+                        setAudit((prev) => ({ ...prev, area_id, area_name }))
+                    }
+                />
 
                 <Input
                     label="Visit Date"

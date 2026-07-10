@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import { buildProductSummary } from "../utils/productSummary";
 import { resolveAreaName } from "./areaService";
 
+import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "docx";
+
 function fmtDate(iso) {
     if (!iso) return "-";
     return new Date(iso).toLocaleString([], {
@@ -28,6 +30,7 @@ export function exportAuditsToExcel(audits, areaMap, filename = "audit-export.xl
             "Position": a.outlet?.position || "-",
             "Mobile": a.outlet?.mobile || "-",
             "Distributor": a.market?.distributor || "-",
+            "Promotion Observed": a.market?.promotion || "-",
             "Competitor": a.market?.competitor || "-",
             "Products Recorded": summary.reduce((s, g) => s + g.count, 0),
             "Product Detail": summary.map((g) => `${g.label}: ${g.items.join(", ")}`).join(" | "),
@@ -86,6 +89,7 @@ export function exportAuditToPDF(audit, areaMap, filename) {
         head: [["Market Information", ""]],
         body: [
             ["Distributor", audit.market?.distributor || "-"],
+            ["Promotion Observed", audit.market?.promotion || "-"],
             ["Competitor", audit.market?.competitor || "-"],
             ["Feedback", audit.market?.feedback || "-"],
             ["Notes", audit.market?.notes || "-"],
@@ -140,4 +144,55 @@ export function exportAuditsToPDF(audits, areaMap, filename = "audit-summary.pdf
     });
 
     doc.save(filename);
+}
+
+/**
+ * Renders a narrative report (from reportService.generateNarrativeSections)
+ * into a downloadable Word document, mirroring a manually-written audit report.
+ */
+export async function exportReportToDocx(sections, meta, filename = "field-audit-report.docx") {
+    const { areaLabel, startDate, endDate, generatedAt } = meta;
+
+    const children = [
+        new Paragraph({
+            text: "Excel Chemicals — Field Sales Auditor Report",
+            heading: HeadingLevel.TITLE,
+        }),
+        new Paragraph({ text: `Area: ${areaLabel}` }),
+        new Paragraph({ text: `Period: ${startDate} to ${endDate}` }),
+        new Paragraph({ text: `Generated: ${generatedAt}` }),
+        new Paragraph({ text: "" }),
+    ];
+
+    for (const section of sections) {
+        children.push(
+            new Paragraph({ text: section.heading, heading: HeadingLevel.HEADING_1 })
+        );
+
+        if (section.type === "paragraph" && section.text) {
+            children.push(new Paragraph({ children: [new TextRun(section.text)] }));
+        }
+
+        if (section.type === "bullets" && section.items) {
+            for (const item of section.items) {
+                children.push(new Paragraph({ text: item, bullet: { level: 0 } }));
+            }
+        }
+
+        children.push(new Paragraph({ text: "" }));
+    }
+
+    const doc = new Document({
+        sections: [{ properties: {}, children }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }

@@ -1,159 +1,104 @@
+import { useEffect, useState } from "react";
 import Card from "../common/Card";
 import CardTitle from "../common/CardTitle";
+import Input from "../common/Input";
+import Toggle from "../common/Toggle";
+import ComboSelect from "../common/ComboSelect";
+import Label from "../common/Label";
 import { useAudit } from "../../contexts/AuditContext";
-
-import {
-    DISTRIBUTORS,
-    POSITIONS,
-} from "../../config/productCatalog";
+import { getDistributors, findOrCreateDistributor } from "../../services/distributorService";
+import { DISTRIBUTORS as FALLBACK_DISTRIBUTORS } from "../../config/productCatalog";
 
 export default function MarketStep() {
     const { audit, setAudit } = useAudit();
-
     const market = audit.market || {};
 
+    const [distributors, setDistributors] = useState(FALLBACK_DISTRIBUTORS);
+
+    useEffect(() => {
+        getDistributors()
+            .then((list) => {
+                if (list && list.length > 0) {
+                    setDistributors(list.map((d) => d.name));
+                }
+            })
+            .catch(console.error);
+    }, []);
+
     function update(field, value) {
+        setAudit((prev) => ({
+            ...prev,
+            market: {
+                ...prev.market,
+                [field]: value,
+            },
+        }));
+    }
 
-    setAudit(prev => ({
-
-        ...prev,
-
-        market: {
-
-            ...prev.market,
-
-            [field]: value,
-
-        },
-
-    }));
-
-}
+    async function handleAddDistributor(name) {
+        const created = await findOrCreateDistributor(name);
+        setDistributors((prev) => (prev.includes(created.name) ? prev : [...prev, created.name].sort()));
+        update("distributor", created.name);
+    }
 
     return (
 
         <Card>
 
-            <CardTitle icon="🏪">
-                Market Information
-            </CardTitle>
+            <CardTitle icon="🏪">Market Information</CardTitle>
 
-            <div className="space-y-5">
-                            {/* Contact Person */}
+            <div style={{ display: "grid", gap: 4 }}>
 
-            <div>
-                <label className="block text-sm font-medium mb-2">
-                    Contact Person Position
-                </label>
+                <ComboSelect
+                    label="Main Distributor"
+                    placeholder="Select Distributor"
+                    value={market.distributor}
+                    options={distributors}
+                    onChange={(v) => update("distributor", v)}
+                    onAddNew={handleAddDistributor}
+                />
 
-                <select
-                    className="w-full border rounded-lg p-3"
-                    value={market.position || ""}
-                    onChange={(e) =>
-                        update("position", e.target.value)
-                    }
-                >
-                    <option value="">
-                        Select Position
-                    </option>
+                <div style={{ marginBottom: 16 }}>
+                    <Label>Promotional Activity Observed?</Label>
+                    <Toggle
+                        options={["Yes", "No"]}
+                        value={market.promotion || ""}
+                        onChange={(v) => update("promotion", v)}
+                    />
+                </div>
 
-                    {POSITIONS.map((position) => (
-                        <option
-                            key={position}
-                            value={position}
-                        >
-                            {position}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {/* Distributor */}
-
-            <div>
-                <label className="block text-sm font-medium mb-2">
-                    Main Distributor
-                </label>
-
-                <select
-                    className="w-full border rounded-lg p-3"
-                    value={market.distributor || ""}
-                    onChange={(e) =>
-                        update("distributor", e.target.value)
-                    }
-                >
-                    <option value="">
-                        Select Distributor
-                    </option>
-
-                    {DISTRIBUTORS.map((distributor) => (
-                        <option
-                            key={distributor}
-                            value={distributor}
-                        >
-                            {distributor}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {/* Competitor */}
-
-            <div>
-                <label className="block text-sm font-medium mb-2">
-                    Main Competitor
-                </label>
-
-                <input
-                    type="text"
-                    className="w-full border rounded-lg p-3"
-                    placeholder="e.g. Coca-Cola, Kevian, Del Monte..."
+                <Input
+                    label="Main Competitor"
+                    placeholder="e.g. Dasani, Del Monte, Cadbury..."
                     value={market.competitor || ""}
-                    onChange={(e) =>
-                        update("competitor", e.target.value)
-                    }
+                    onChange={(e) => update("competitor", e.target.value)}
                 />
-            </div>
-                        {/* Retailer Feedback */}
 
-            <div>
-                <label className="block text-sm font-medium mb-2">
-                    Retailer Feedback
-                </label>
+                <div style={{ marginBottom: 16 }}>
+                    <Label>Retailer Feedback</Label>
+                    <textarea
+                        rows={4}
+                        className="eb-input"
+                        placeholder="What did the retailer say about Excel products?"
+                        value={market.feedback || ""}
+                        onChange={(e) => update("feedback", e.target.value)}
+                    />
+                </div>
 
-                <textarea
-                    rows={4}
-                    className="w-full border rounded-lg p-3"
-                    placeholder="What did the retailer say about Excel products?"
-                    value={market.feedback || ""}
-                    onChange={(e) =>
-                        update("feedback", e.target.value)
-                    }
-                />
-            </div>
+                <div style={{ marginBottom: 16 }}>
+                    <Label>Additional Notes</Label>
+                    <textarea
+                        rows={4}
+                        className="eb-input"
+                        placeholder="Any additional market observations..."
+                        value={market.notes || ""}
+                        onChange={(e) => update("notes", e.target.value)}
+                    />
+                </div>
 
-            {/* Additional Notes */}
-
-            <div>
-                <label className="block text-sm font-medium mb-2">
-                    Additional Notes
-                </label>
-
-                <textarea
-                    rows={4}
-                    className="w-full border rounded-lg p-3"
-                    placeholder="Any additional market observations..."
-                    value={market.notes || ""}
-                    onChange={(e) =>
-                        update("notes", e.target.value)
-                    }
-                />
             </div>
 
-        </div>
-
-    </Card>
+        </Card>
 
     );
-
 }

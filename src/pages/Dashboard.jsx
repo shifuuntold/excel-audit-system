@@ -143,9 +143,9 @@ export default function Dashboard() {
 
                     <DashboardCard
                         title="Reports"
-                        description="Export availability and sales reports."
+                        description="Generate a written field audit report."
                         icon={FileBarChart}
-                        onClick={() => navigate("/audits/history")}
+                        onClick={() => navigate("/reports")}
                     />
                 </div>
             </PageContainer>

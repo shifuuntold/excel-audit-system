@@ -132,6 +132,7 @@ export default function AuditDetails() {
                 <Section title="Market Information">
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
                         <Field label="Distributor" value={audit.market?.distributor} />
+                        <Field label="Promotion Observed" value={audit.market?.promotion} />
                         <Field label="Competitor" value={audit.market?.competitor} />
                     </div>
                 </Section>

@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, ClipboardPlus, History, ShieldCheck, LogOut } from "lucide-react";
+import { LayoutDashboard, ClipboardPlus, History, FileText, ShieldCheck, LogOut } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { B } from "../../config/theme";
 
@@ -12,6 +12,7 @@ export default function BottomNavigation() {
         { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
         { label: "New Audit", path: "/audit/new", icon: ClipboardPlus },
         { label: "History", path: "/audits/history", icon: History },
+        { label: "Reports", path: "/reports", icon: FileText },
     ];
 
     if (profile?.role === "supervisor") {

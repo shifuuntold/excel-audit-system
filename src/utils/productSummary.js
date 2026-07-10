@@ -85,3 +85,31 @@ export function buildProductSummary(products) {
 export function totalProductsRecorded(products) {
     return buildProductSummary(products).reduce((sum, g) => sum + g.count, 0);
 }
+
+// Every known product line, keyed the same way audits store them —
+// used by product search/filtering and the reports page so groups with
+// zero hits still show up (e.g. "Champ – not available in any outlet").
+export const ALL_PRODUCT_GROUPS = Object.entries({ ...MATRIX_GROUPS, ...FLAT_GROUPS, ...LABELED_FLAT_GROUPS })
+    .map(([key, meta]) => ({ key, label: meta.label, icon: meta.icon }));
+
+/**
+ * Returns true if a given audit's products include at least one checked
+ * item belonging to the given group key.
+ */
+export function auditHasProductGroup(products, groupKey) {
+    const entries = products?.[groupKey];
+    if (!entries) return false;
+    return Object.values(entries).some(Boolean);
+}
+
+/**
+ * Finds product groups whose label matches a free-text search term
+ * (e.g. "dtd", "champ", "water") — used for the product penetration search.
+ */
+export function findMatchingGroups(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return ALL_PRODUCT_GROUPS.filter(
+        (g) => g.label.toLowerCase().includes(q) || g.key.toLowerCase().includes(q)
+    );
+}

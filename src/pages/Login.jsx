@@ -57,6 +57,12 @@ export default function Login() {
                 }}
             >
                 <div style={{ textAlign: "center", marginBottom: 28 }}>
+                    <img
+                        src="https://excel.co.ke/wp-content/uploads/2020/05/Excellogo.png"
+                        alt="Excel Chemicals"
+                        style={{ height: 56, margin: "0 auto 14px", objectFit: "contain" }}
+                        onError={(e) => { e.target.style.display = "none"; }}
+                    />
                     <h1 style={{ fontSize: 26, fontWeight: 700, color: B.blue, margin: 0 }}>
                         Excel Chemicals
                     </h1>

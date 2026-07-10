@@ -29,3 +29,36 @@ export function resolveAreaName(outlet, areaMap) {
     // fall back to resolving the id against the current areas table.
     return outlet.area_name || areaMap?.[outlet.area_id] || outlet.area_id || "-";
 }
+
+/**
+ * Finds an existing area by name (case-insensitive) or creates it.
+ * Used by the location search so any place a rep picks from the map
+ * becomes available in the saved areas list for everyone else too.
+ */
+export async function findOrCreateArea(name, { latitude, longitude } = {}) {
+    const clean = name.trim();
+    if (!clean) throw new Error("Area name is required");
+
+    const { data: existing, error: findError } = await supabase
+        .from("areas")
+        .select("*")
+        .ilike("name", clean)
+        .limit(1)
+        .maybeSingle();
+
+    if (findError) throw findError;
+    if (existing) return existing;
+
+    const { data: created, error: insertError } = await supabase
+        .from("areas")
+        .insert({ name: clean, latitude, longitude })
+        .select()
+        .single();
+
+    if (insertError) throw insertError;
+
+    // bust the cached id->name map so the new area shows up immediately
+    _areaMapCache = null;
+
+    return created;
+}

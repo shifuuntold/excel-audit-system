@@ -61,6 +61,7 @@ export default function ReviewStep() {
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
                         <Field label="Distributor" value={market.distributor} />
+                        <Field label="Promotion Observed" value={market.promotion} />
                         <Field label="Competitor" value={market.competitor} />
                     </div>
                 </div>

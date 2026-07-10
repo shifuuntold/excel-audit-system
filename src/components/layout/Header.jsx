@@ -47,6 +47,21 @@ export default function Header({ title, subtitle, backTo, action }) {
                         </button>
                     )}
 
+                    <img
+                        src="https://excel.co.ke/wp-content/uploads/2020/05/Excellogo.png"
+                        alt="Excel Chemicals"
+                        style={{
+                            height: 32,
+                            width: 32,
+                            objectFit: "contain",
+                            borderRadius: 8,
+                            background: "#fff",
+                            padding: 3,
+                            flexShrink: 0,
+                        }}
+                        onError={(e) => { e.target.style.display = "none"; }}
+                    />
+
                     <div style={{ minWidth: 0 }}>
                         <h1
                             style={{

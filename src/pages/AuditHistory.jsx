@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
-import { totalProductsRecorded } from "../utils/productSummary";
+import { totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -48,6 +48,7 @@ export default function AuditHistory() {
     const [endDate, setEndDate] = useState(PRESETS.today().end);
     const [areaId, setAreaId] = useState("");
     const [search, setSearch] = useState("");
+    const [productQuery, setProductQuery] = useState("");
 
     useEffect(() => {
         getAreas().then(setAreas).catch(console.error);
@@ -89,6 +90,25 @@ export default function AuditHistory() {
         const q = search.trim().toLowerCase();
         return audits.filter((a) => (a.outlet?.shop_name || "").toLowerCase().includes(q));
     }, [audits, search]);
+
+    const productResults = useMemo(() => {
+        const groups = findMatchingGroups(productQuery);
+        if (groups.length === 0) return [];
+
+        return groups.map((group) => {
+            const matches = audits.filter((a) => auditHasProductGroup(a.products, group.key));
+            return {
+                ...group,
+                count: matches.length,
+                pct: audits.length ? Math.round((matches.length / audits.length) * 100) : 0,
+                outlets: matches.map((a) => ({
+                    id: a.id,
+                    name: a.outlet?.shop_name || "Unnamed Outlet",
+                    area: resolveAreaName(a.outlet, areaMap),
+                })),
+            };
+        });
+    }, [audits, productQuery, areaMap]);
 
     async function handleExportExcel() {
         if (filteredAudits.length === 0) return;
@@ -179,6 +199,12 @@ export default function AuditHistory() {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
+                        <Input
+                            label="Search Product"
+                            placeholder="e.g. DTD, Champ, Water..."
+                            value={productQuery}
+                            onChange={(e) => setProductQuery(e.target.value)}
+                        />
                     </div>
 
                     <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
@@ -202,6 +228,45 @@ export default function AuditHistory() {
                         </Button>
                     </div>
                 </div>
+
+                {productQuery.trim() && (
+                    <div style={{ marginBottom: 20 }}>
+                        {productResults.length === 0 ? (
+                            <div style={{ background: B.blueFaint, borderRadius: 14, padding: 16, fontSize: 13, color: B.muted }}>
+                                No product line matches "{productQuery}".
+                            </div>
+                        ) : (
+                            productResults.map((group) => (
+                                <div
+                                    key={group.key}
+                                    style={{
+                                        background: B.white,
+                                        borderRadius: 14,
+                                        border: `1px solid ${B.blueLight}`,
+                                        boxShadow: "0 2px 14px rgba(0,48,135,0.06)",
+                                        padding: 18,
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                        <span style={{ fontSize: 15, fontWeight: 700 }}>
+                                            {group.icon} {group.label}
+                                        </span>
+                                        <span style={{ fontSize: 12, fontWeight: 700, color: B.blue, background: B.blueFaint, padding: "3px 10px", borderRadius: 10 }}>
+                                            {group.count} of {audits.length} outlets ({group.pct}%)
+                                        </span>
+                                    </div>
+
+                                    {group.outlets.length > 0 && (
+                                        <p style={{ fontSize: 12.5, color: B.muted, marginTop: 8, lineHeight: 1.7 }}>
+                                            {group.outlets.map((o) => `${o.name} (${o.area})`).join(" · ")}
+                                        </p>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                )}
 
                 {loading ? (
                     <LoadingSpinner label="Loading audits..." />
