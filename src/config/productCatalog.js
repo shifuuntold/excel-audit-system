@@ -83,3 +83,52 @@ export {
     INVALID, cellOk,
     POSITIONS, DISTRIBUTORS, STEPS,
 };
+// Competitor categories, matching the field audit report's structure —
+// each maps to the Excel product line(s) it competes against, and ships
+// with the brand names already seen in past audits as a starting list.
+// The competitors table in Supabase is the source of truth once seeded;
+// this is the fallback if that fetch fails or is empty.
+export const COMPETITOR_CATEGORIES = [
+    {
+        key: "water",
+        label: "Water",
+        productKey: "water",
+        options: ["Eden Waves", "Aquatick", "Dasani", "Keringet", "Glacier", "Highland", "Aquaclear", "Aquabook", "Aqua Creek", "Mt. Kenyan", "Belmont Springs", "Oxyrich", "Aquamist", "Quumist", "Baraka", "Mountain Chill", "Waba"],
+    },
+    {
+        key: "rtd",
+        label: "RTD",
+        productKey: "rtd",
+        options: ["Minute Maid", "Ukwaju", "Embe", "Jooz", "Afia", "Frutz", "Marchie"],
+    },
+    {
+        key: "dc",
+        label: "Drinking Chocolate",
+        productKey: "dc",
+        options: ["Choco Primo", "Cadbury", "Dairyland", "Miksi", "Twisco"],
+    },
+    {
+        key: "cocoa",
+        label: "Cocoa",
+        productKey: "cocoa",
+        options: ["Coco Primo", "Cadbury"],
+    },
+    {
+        key: "tetrapak",
+        label: "Tetra Pack (Fruit Full)",
+        productKey: "ff",
+        options: ["Pick n Peel", "Suntop", "Ribena", "Del Monte", "Dairy Fresh", "Frosti", "Orchid Valley"],
+    },
+    {
+        key: "gluc",
+        label: "Glucose",
+        productKey: "gluc",
+        options: ["Mr. Energy", "Clovers", "Rapras", "K-Power"],
+    },
+    {
+        key: "dtd",
+        label: "DTD (Quencher DTT)",
+        productKey: "dtt",
+        options: ["Savannah", "Highlands", "Pep"],
+    },
+];

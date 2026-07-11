@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAudit } from "../../contexts/AuditContext";
 import { POSITIONS } from "../../config/productCatalog";
 
@@ -54,6 +54,16 @@ export default function OutletForm() {
             { enableHighAccuracy: true, timeout: 12000 }
         );
     }
+
+    // Auto-capture on arrival so most reps never need to tap the button —
+    // only fires once, and only if we don't already have coordinates
+    // (e.g. when editing an audit that was already GPS-tagged).
+    useEffect(() => {
+        if (!audit.latitude && !audit.longitude) {
+            captureLocation();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
 

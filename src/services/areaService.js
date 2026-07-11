@@ -62,3 +62,9 @@ export async function findOrCreateArea(name, { latitude, longitude } = {}) {
 
     return created;
 }
+
+export async function deleteArea(id) {
+    const { error } = await supabase.from("areas").delete().eq("id", id);
+    if (error) throw error;
+    _areaMapCache = null;
+}

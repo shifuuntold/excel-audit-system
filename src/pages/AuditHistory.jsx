@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
+import { summarizeFeedback } from "../services/reportService";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -13,7 +14,7 @@ import Input from "../components/common/Input";
 import Select from "../components/common/Select";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
-import { ClipboardX, MapPin, User, Clock, FileSpreadsheet, FileText } from "lucide-react";
+import { ClipboardX, MapPin, User, Clock, FileSpreadsheet, FileText, MessageSquare } from "lucide-react";
 
 function isoDate(d) {
     return d.toISOString().split("T")[0];
@@ -110,11 +111,13 @@ export default function AuditHistory() {
         });
     }, [audits, productQuery, areaMap]);
 
+    const feedbackSummary = useMemo(() => summarizeFeedback(audits), [audits]);
+
     async function handleExportExcel() {
         if (filteredAudits.length === 0) return;
         setExporting(true);
         try {
-            const { exportAuditsToExcel } = await import("../services/exportService");
+            const { exportAuditsToExcel } = await import("../services/excelExport");
             exportAuditsToExcel(filteredAudits, areaMap, `excel-chemicals-audits-${startDate || "all"}_to_${endDate || "all"}.xlsx`);
         } finally {
             setExporting(false);
@@ -125,7 +128,7 @@ export default function AuditHistory() {
         if (filteredAudits.length === 0) return;
         setExporting(true);
         try {
-            const { exportAuditsToPDF } = await import("../services/exportService");
+            const { exportAuditsToPDF } = await import("../services/pdfExport");
             exportAuditsToPDF(filteredAudits, areaMap, `excel-chemicals-audits-${startDate || "all"}_to_${endDate || "all"}.pdf`);
         } finally {
             setExporting(false);
@@ -264,6 +267,43 @@ export default function AuditHistory() {
                                     )}
                                 </div>
                             ))
+                        )}
+                    </div>
+                )}
+
+                {!loading && feedbackSummary.total > 0 && (
+                    <div
+                        style={{
+                            background: B.white,
+                            borderRadius: 14,
+                            border: `1px solid ${B.blueLight}`,
+                            boxShadow: "0 2px 14px rgba(0,48,135,0.06)",
+                            padding: 18,
+                            marginBottom: 20,
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                            <MessageSquare size={16} style={{ color: B.blue }} />
+                            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
+                                Retailer Feedback Summary
+                            </h3>
+                            <span style={{ fontSize: 11, color: B.muted, fontWeight: 600 }}>
+                                ({feedbackSummary.total} comment{feedbackSummary.total === 1 ? "" : "s"})
+                            </span>
+                        </div>
+
+                        {feedbackSummary.themeLines.length === 0 ? (
+                            <p style={{ fontSize: 13, color: B.muted, margin: 0 }}>
+                                No common themes detected — see individual audits for feedback.
+                            </p>
+                        ) : (
+                            <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 6 }}>
+                                {feedbackSummary.themeLines.map((line, i) => (
+                                    <li key={i} style={{ fontSize: 13, color: B.text, lineHeight: 1.6 }}>
+                                        {line}
+                                    </li>
+                                ))}
+                            </ul>
                         )}
                     </div>
                 )}

@@ -1,29 +1,14 @@
-import { useEffect, useState } from "react";
 import Card from "../common/Card";
 import CardTitle from "../common/CardTitle";
-import Input from "../common/Input";
 import Toggle from "../common/Toggle";
-import ComboSelect from "../common/ComboSelect";
+import CompetitorPicker from "./CompetitorPicker";
+import DistributorPicker from "./DistributorPicker";
 import Label from "../common/Label";
 import { useAudit } from "../../contexts/AuditContext";
-import { getDistributors, findOrCreateDistributor } from "../../services/distributorService";
-import { DISTRIBUTORS as FALLBACK_DISTRIBUTORS } from "../../config/productCatalog";
 
 export default function MarketStep() {
     const { audit, setAudit } = useAudit();
     const market = audit.market || {};
-
-    const [distributors, setDistributors] = useState(FALLBACK_DISTRIBUTORS);
-
-    useEffect(() => {
-        getDistributors()
-            .then((list) => {
-                if (list && list.length > 0) {
-                    setDistributors(list.map((d) => d.name));
-                }
-            })
-            .catch(console.error);
-    }, []);
 
     function update(field, value) {
         setAudit((prev) => ({
@@ -35,12 +20,6 @@ export default function MarketStep() {
         }));
     }
 
-    async function handleAddDistributor(name) {
-        const created = await findOrCreateDistributor(name);
-        setDistributors((prev) => (prev.includes(created.name) ? prev : [...prev, created.name].sort()));
-        update("distributor", created.name);
-    }
-
     return (
 
         <Card>
@@ -49,13 +28,9 @@ export default function MarketStep() {
 
             <div style={{ display: "grid", gap: 4 }}>
 
-                <ComboSelect
-                    label="Main Distributor"
-                    placeholder="Select Distributor"
-                    value={market.distributor}
-                    options={distributors}
-                    onChange={(v) => update("distributor", v)}
-                    onAddNew={handleAddDistributor}
+                <DistributorPicker
+                    value={market.distributors || []}
+                    onChange={(v) => update("distributors", v)}
                 />
 
                 <div style={{ marginBottom: 16 }}>
@@ -67,11 +42,9 @@ export default function MarketStep() {
                     />
                 </div>
 
-                <Input
-                    label="Main Competitor"
-                    placeholder="e.g. Dasani, Del Monte, Cadbury..."
-                    value={market.competitor || ""}
-                    onChange={(e) => update("competitor", e.target.value)}
+                <CompetitorPicker
+                    value={market.competitors || {}}
+                    onChange={(v) => update("competitors", v)}
                 />
 
                 <div style={{ marginBottom: 16 }}>

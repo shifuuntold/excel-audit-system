@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, ClipboardPlus, History, FileText, ShieldCheck, LogOut } from "lucide-react";
+import { LayoutDashboard, ClipboardPlus, History, FileText, ShieldCheck, Settings, LogOut } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { canViewAllAudits, isAdmin } from "../../utils/roles";
 import { B } from "../../config/theme";
 
 export default function BottomNavigation() {
@@ -15,8 +16,12 @@ export default function BottomNavigation() {
         { label: "Reports", path: "/reports", icon: FileText },
     ];
 
-    if (profile?.role === "supervisor") {
+    if (canViewAllAudits(profile?.role)) {
         items.push({ label: "Team", path: "/supervisor", icon: ShieldCheck });
+    }
+
+    if (isAdmin(profile?.role)) {
+        items.push({ label: "Admin", path: "/admin", icon: Settings });
     }
 
     async function handleLogout() {

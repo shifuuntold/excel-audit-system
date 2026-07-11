@@ -2,6 +2,8 @@ import Card from "../common/Card";
 import CardTitle from "../common/CardTitle";
 import { useAudit } from "../../contexts/AuditContext";
 import { buildProductSummary } from "../../utils/productSummary";
+import { competitorSummaryText } from "../../utils/competitors";
+import { distributorSummaryText } from "../../utils/distributors";
 import { B } from "../../config/theme";
 
 function Field({ label, value }) {
@@ -60,9 +62,11 @@ export default function ReviewStep() {
                     </h3>
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
-                        <Field label="Distributor" value={market.distributor} />
+                        <Field label="Distributor" value={distributorSummaryText(market)} />
                         <Field label="Promotion Observed" value={market.promotion} />
-                        <Field label="Competitor" value={market.competitor} />
+                    </div>
+                    <div style={{ marginTop: 14 }}>
+                        <Field label="Competitors Observed" value={competitorSummaryText(market)} />
                     </div>
                 </div>
 

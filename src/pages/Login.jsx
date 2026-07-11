@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { B } from "../config/theme";
+import { B, LOGO_URL } from "../config/theme";
 import Button from "../components/common/Button";
 import Input from "../components/common/Input";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -58,9 +58,9 @@ export default function Login() {
             >
                 <div style={{ textAlign: "center", marginBottom: 28 }}>
                     <img
-                        src="https://excel.co.ke/wp-content/uploads/2020/05/Excellogo.png"
+                        src={LOGO_URL}
                         alt="Excel Chemicals"
-                        style={{ height: 56, margin: "0 auto 14px", objectFit: "contain" }}
+                        style={{ height: 72, maxWidth: "70%", display: "block", margin: "0 auto 16px", objectFit: "contain" }}
                         onError={(e) => { e.target.style.display = "none"; }}
                     />
                     <h1 style={{ fontSize: 26, fontWeight: 700, color: B.blue, margin: 0 }}>

@@ -39,3 +39,8 @@ export async function findOrCreateDistributor(name) {
 
     return created;
 }
+
+export async function deleteDistributor(id) {
+    const { error } = await supabase.from("distributors").delete().eq("id", id);
+    if (error) throw error;
+}

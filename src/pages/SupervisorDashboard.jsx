@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { getProfileMap } from "../services/profileService";
@@ -24,7 +25,7 @@ export default function SupervisorDashboard() {
     const { profile } = useAuth();
     const navigate = useNavigate();
 
-    const isSupervisor = profile?.role === "supervisor";
+    const isSupervisor = canViewAllAudits(profile?.role);
 
     const [audits, setAudits] = useState([]);
     const [areas, setAreas] = useState([]);
@@ -115,7 +116,7 @@ export default function SupervisorDashboard() {
                             Supervisor access required
                         </h2>
                         <p style={{ color: B.muted, fontSize: 13, margin: 0 }}>
-                            This dashboard is only available to accounts with the supervisor role.
+                            This dashboard is only available to Supervisor or Admin accounts.
                         </p>
                         <Button variant="secondary" size="sm" onClick={() => navigate("/dashboard")} style={{ marginTop: 16 }}>
                             Back to Dashboard
@@ -154,7 +155,7 @@ export default function SupervisorDashboard() {
                             variant="secondary" size="sm" icon={FileSpreadsheet}
                             disabled={audits.length === 0}
                             onClick={async () => {
-                                const { exportAuditsToExcel } = await import("../services/exportService");
+                                const { exportAuditsToExcel } = await import("../services/excelExport");
                                 exportAuditsToExcel(audits, areaMap, `team-audits-${startDate}_to_${endDate}.xlsx`);
                             }}
                         >
@@ -164,7 +165,7 @@ export default function SupervisorDashboard() {
                             variant="secondary" size="sm" icon={FileText}
                             disabled={audits.length === 0}
                             onClick={async () => {
-                                const { exportAuditsToPDF } = await import("../services/exportService");
+                                const { exportAuditsToPDF } = await import("../services/pdfExport");
                                 exportAuditsToPDF(audits, areaMap, `team-audits-${startDate}_to_${endDate}.pdf`);
                             }}
                         >

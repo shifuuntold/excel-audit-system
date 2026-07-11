@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { B } from "../../config/theme";
+import { B, LOGO_URL } from "../../config/theme";
 
 export default function Header({ title, subtitle, backTo, action }) {
     const navigate = useNavigate();
@@ -48,15 +48,15 @@ export default function Header({ title, subtitle, backTo, action }) {
                     )}
 
                     <img
-                        src="https://excel.co.ke/wp-content/uploads/2020/05/Excellogo.png"
+                        src={LOGO_URL}
                         alt="Excel Chemicals"
                         style={{
-                            height: 32,
-                            width: 32,
+                            height: 40,
+                            maxWidth: 130,
                             objectFit: "contain",
                             borderRadius: 8,
                             background: "#fff",
-                            padding: 3,
+                            padding: "4px 8px",
                             flexShrink: 0,
                         }}
                         onError={(e) => { e.target.style.display = "none"; }}

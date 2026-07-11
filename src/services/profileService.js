@@ -41,3 +41,27 @@ export async function getProfileMap() {
 
     return Object.fromEntries((data || []).map((p) => [p.id, p]));
 }
+
+export async function getAllProfiles() {
+    const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, role")
+        .order("full_name");
+
+    if (error) throw error;
+
+    return data || [];
+}
+
+export async function updateUserRole(userId, role) {
+    const { data, error } = await supabase
+        .from("profiles")
+        .update({ role })
+        .eq("id", userId)
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    return data;
+}

@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
 import { supabase } from "../lib/supabase";
 import { getAreaMap, resolveAreaName } from "../services/areaService";
 import { buildProductSummary } from "../utils/productSummary";
+import { competitorSummaryText } from "../utils/competitors";
+import { distributorSummaryText } from "../utils/distributors";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
-import { FileText } from "lucide-react";
+import { FileText, Pencil } from "lucide-react";
 
 function Field({ label, value }) {
     return (
@@ -47,6 +49,7 @@ function Section({ title, children }) {
 
 export default function AuditDetails() {
     const { id } = useParams();
+    const navigate = useNavigate();
 
     const [audit, setAudit] = useState(null);
     const [areaMap, setAreaMap] = useState({});
@@ -99,18 +102,29 @@ export default function AuditDetails() {
                 subtitle={new Date(audit.created_at).toLocaleString()}
                 backTo="/audits/history"
                 action={
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        icon={FileText}
-                        onClick={async () => {
-                            const { exportAuditToPDF } = await import("../services/exportService");
-                            exportAuditToPDF(audit, areaMap);
-                        }}
-                        style={{ background: "rgba(255,255,255,0.14)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.4)" }}
-                    >
-                        PDF
-                    </Button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={Pencil}
+                            onClick={() => navigate(`/audit/${id}/edit`)}
+                            style={{ background: "rgba(255,255,255,0.14)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.4)" }}
+                        >
+                            Edit
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={FileText}
+                            onClick={async () => {
+                                const { exportAuditToPDF } = await import("../services/pdfExport");
+                                exportAuditToPDF(audit, areaMap);
+                            }}
+                            style={{ background: "rgba(255,255,255,0.14)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.4)" }}
+                        >
+                            PDF
+                        </Button>
+                    </div>
                 }
             />
 
@@ -131,9 +145,11 @@ export default function AuditDetails() {
 
                 <Section title="Market Information">
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
-                        <Field label="Distributor" value={audit.market?.distributor} />
+                        <Field label="Distributor" value={distributorSummaryText(audit.market)} />
                         <Field label="Promotion Observed" value={audit.market?.promotion} />
-                        <Field label="Competitor" value={audit.market?.competitor} />
+                    </div>
+                    <div style={{ marginTop: 16 }}>
+                        <Field label="Competitors Observed" value={competitorSummaryText(audit.market)} />
                     </div>
                 </Section>
 

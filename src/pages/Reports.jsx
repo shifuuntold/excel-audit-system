@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { buildReportData, generateNarrativeSections } from "../services/reportService";
@@ -20,7 +21,7 @@ function isoDate(d) {
 
 export default function Reports() {
     const { user, profile } = useAuth();
-    const isSupervisor = profile?.role === "supervisor";
+    const isSupervisor = canViewAllAudits(profile?.role);
 
     const [areas, setAreas] = useState([]);
     const [areaMap, setAreaMap] = useState({});
@@ -87,7 +88,7 @@ export default function Reports() {
     async function handleDownload() {
         setDownloading(true);
         try {
-            const { exportReportToDocx } = await import("../services/exportService");
+            const { exportReportToDocx } = await import("../services/docxExport");
             await exportReportToDocx(sections, {
                 areaLabel,
                 startDate,
