@@ -14,7 +14,6 @@ import PageContainer from "../components/layout/PageContainer";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
-import { totalProductsRecorded } from "../utils/productSummary";
 import { B } from "../config/theme";
 
 const STEP_LABELS = ["Outlet", "Products", "Market", "Review"];
@@ -122,11 +121,7 @@ export default function NewAudit() {
             setStep(1);
             return;
         }
-        if (totalProductsRecorded(audit.products) === 0) {
-            setError("Please record at least one product before submitting.");
-            setStep(2);
-            return;
-        }
+        
         setError("");
         setSubmitting(true);
 
