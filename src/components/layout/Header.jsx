@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { B, LOGO_URL } from "../../config/theme";
+import { B } from "../../config/theme";
+import excelLogo from "../../assets/excel-logo.png";
 
 export default function Header({ title, subtitle, backTo, action }) {
     const navigate = useNavigate();
@@ -48,7 +49,7 @@ export default function Header({ title, subtitle, backTo, action }) {
                     )}
 
                     <img
-                        src={LOGO_URL}
+                        src={excelLogo}
                         alt="Excel Chemicals"
                         style={{
                             height: 40,

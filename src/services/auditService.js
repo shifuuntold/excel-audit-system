@@ -55,3 +55,15 @@ export async function updateAudit(id, { outlet, products, market }) {
 
     return data;
 }
+
+export async function deleteAudit(id) {
+    const { error } = await supabase
+        .from("audit_submissions")
+        .delete()
+        .eq("id", id);
+
+    if (error) {
+        console.error(error);
+        throw error;
+    }
+}

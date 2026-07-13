@@ -62,6 +62,7 @@ export default function ReviewStep() {
                     </h3>
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+                        <Field label="Visited by Sales Rep" value={market.visited} />
                         <Field label="Distributor" value={distributorSummaryText(market)} />
                         <Field label="Promotion Observed" value={market.promotion} />
                     </div>

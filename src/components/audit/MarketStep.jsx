@@ -28,6 +28,15 @@ export default function MarketStep() {
 
             <div style={{ display: "grid", gap: 4 }}>
 
+                <div style={{ marginBottom: 16 }}>
+                    <Label>Visited by a Sales Representative?</Label>
+                    <Toggle
+                        options={["Yes", "No"]}
+                        value={market.visited || ""}
+                        onChange={(v) => update("visited", v)}
+                    />
+                </div>
+
                 <DistributorPicker
                     value={market.distributors || []}
                     onChange={(v) => update("distributors", v)}

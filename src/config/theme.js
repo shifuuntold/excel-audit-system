@@ -24,9 +24,6 @@ export const B = {
     white:"#FFFFFF",
 
 };
-// Best-guess clean logo mark (no tagline) from excel.co.ke's theme assets.
-// If this still shows a tagline/slogan, swap for one of:
-//   https://excel.co.ke/wp-content/uploads/2020/03/Excel-logo-1.png
-//   https://excel.co.ke/wp-content/uploads/2020/05/Excellogo.png (has the tagline baked in)
-// or drop a local file into src/assets and import it instead.
-export const LOGO_URL = "https://excel.co.ke/wp-content/themes/bridge/img/logo_black.png";
+// Logo now lives locally at src/assets/excel-logo.png (imported directly
+// where needed) — the previous external URL guesses turned out wrong,
+// this one is cropped from a screenshot you confirmed is correct.

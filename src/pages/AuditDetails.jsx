@@ -2,17 +2,20 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 import { supabase } from "../lib/supabase";
+import { deleteAudit } from "../services/auditService";
 import { getAreaMap, resolveAreaName } from "../services/areaService";
 import { buildProductSummary } from "../utils/productSummary";
 import { competitorSummaryText } from "../utils/competitors";
 import { distributorSummaryText } from "../utils/distributors";
+import { useAuth } from "../contexts/AuthContext";
+import { canViewAllAudits } from "../utils/roles";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
-import { FileText, Pencil } from "lucide-react";
+import { FileText, Pencil, Trash2 } from "lucide-react";
 
 function Field({ label, value }) {
     return (
@@ -50,10 +53,13 @@ function Section({ title, children }) {
 export default function AuditDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { user, profile } = useAuth();
 
     const [audit, setAudit] = useState(null);
     const [areaMap, setAreaMap] = useState({});
     const [loading, setLoading] = useState(true);
+    const [deleting, setDeleting] = useState(false);
+    const [exportingPdf, setExportingPdf] = useState(false);
 
     useEffect(() => {
         async function loadAudit() {
@@ -75,6 +81,29 @@ export default function AuditDetails() {
         getAreaMap().then(setAreaMap).catch(console.error);
     }, [id]);
 
+    async function handleDelete() {
+        if (!confirm("Delete this audit? This can't be undone.")) return;
+        setDeleting(true);
+        try {
+            await deleteAudit(id);
+            navigate("/audits/history");
+        } catch (error) {
+            console.error(error);
+            alert("Couldn't delete this audit. Please try again.");
+            setDeleting(false);
+        }
+    }
+
+    async function handleExportPdf() {
+        setExportingPdf(true);
+        try {
+            const { exportAuditToPDF } = await import("../services/pdfExport");
+            exportAuditToPDF(audit, areaMap);
+        } finally {
+            setExportingPdf(false);
+        }
+    }
+
     if (loading) {
         return <LoadingSpinner fullScreen label="Loading audit..." />;
     }
@@ -95,37 +124,15 @@ export default function AuditDetails() {
     const summary = buildProductSummary(audit.products);
     const totalCount = summary.reduce((sum, g) => sum + g.count, 0);
 
+    // Own audit, or a supervisor/admin who can manage any audit
+    const canManage = audit.user_id === user?.id || canViewAllAudits(profile?.role);
+
     return (
         <>
             <Header
                 title={audit.outlet?.shop_name || "Audit Details"}
                 subtitle={new Date(audit.created_at).toLocaleString()}
                 backTo="/audits/history"
-                action={
-                    <div style={{ display: "flex", gap: 8 }}>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            icon={Pencil}
-                            onClick={() => navigate(`/audit/${id}/edit`)}
-                            style={{ background: "rgba(255,255,255,0.14)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.4)" }}
-                        >
-                            Edit
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            icon={FileText}
-                            onClick={async () => {
-                                const { exportAuditToPDF } = await import("../services/pdfExport");
-                                exportAuditToPDF(audit, areaMap);
-                            }}
-                            style={{ background: "rgba(255,255,255,0.14)", color: "#fff", border: "1.5px solid rgba(255,255,255,0.4)" }}
-                        >
-                            PDF
-                        </Button>
-                    </div>
-                }
             />
 
             <PageContainer withNav={false}>
@@ -145,6 +152,7 @@ export default function AuditDetails() {
 
                 <Section title="Market Information">
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
+                        <Field label="Visited by Sales Rep" value={audit.market?.visited} />
                         <Field label="Distributor" value={distributorSummaryText(audit.market)} />
                         <Field label="Promotion Observed" value={audit.market?.promotion} />
                     </div>
@@ -182,6 +190,41 @@ export default function AuditDetails() {
                         <strong>Notes:</strong> {audit.market?.notes || "No notes recorded."}
                     </p>
                 </Section>
+
+                {canManage && (
+                    <div
+                        style={{
+                            display: "flex",
+                            gap: 10,
+                            flexWrap: "wrap",
+                            paddingTop: 8,
+                        }}
+                    >
+                        <Button
+                            variant="primary"
+                            icon={Pencil}
+                            onClick={() => navigate(`/audit/${id}/edit`)}
+                        >
+                            Edit Audit
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            icon={FileText}
+                            loading={exportingPdf}
+                            onClick={handleExportPdf}
+                        >
+                            Download PDF
+                        </Button>
+                        <Button
+                            variant="danger"
+                            icon={Trash2}
+                            loading={deleting}
+                            onClick={handleDelete}
+                        >
+                            Delete
+                        </Button>
+                    </div>
+                )}
             </PageContainer>
         </>
     );

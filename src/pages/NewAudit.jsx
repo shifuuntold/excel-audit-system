@@ -13,6 +13,8 @@ import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
 import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
+import ErrorMessage from "../components/common/ErrorMessage";
+import { totalProductsRecorded } from "../utils/productSummary";
 import { B } from "../config/theme";
 
 const STEP_LABELS = ["Outlet", "Products", "Market", "Review"];
@@ -40,6 +42,7 @@ export default function NewAudit() {
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [loadingExisting, setLoadingExisting] = useState(!!editId);
+    const [error, setError] = useState("");
 
     // Load the existing audit into the form when editing, otherwise start blank
     useEffect(() => {
@@ -74,15 +77,57 @@ export default function NewAudit() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editId]);
 
+    function validateStep(targetStep) {
+        if (targetStep === 1) {
+            if (!audit.shop_name?.trim()) return "Please enter the shop name.";
+            if (!audit.area_id) return "Please search and select an area.";
+            if (!audit.visit_date) return "Please select a visit date.";
+        }
+        return null;
+    }
+
     const nextStep = () => {
+        const err = validateStep(step);
+        if (err) { setError(err); return; }
+        setError("");
         if (step < 4) setStep(step + 1);
     };
 
     const previousStep = () => {
+        setError("");
         if (step > 1) setStep(step - 1);
     };
 
+    // Lets a rep tap any step number to jump straight there. Going
+    // backward is always fine; jumping forward still has to clear the
+    // same outlet-info check the "Next" button enforces.
+    function goToStep(targetStep) {
+        if (targetStep === step) return;
+        if (targetStep > 1) {
+            const err = validateStep(1);
+            if (err) {
+                setError(err);
+                setStep(1);
+                return;
+            }
+        }
+        setError("");
+        setStep(targetStep);
+    }
+
     async function handleSubmit() {
+        const outletError = validateStep(1);
+        if (outletError) {
+            setError(outletError);
+            setStep(1);
+            return;
+        }
+        if (totalProductsRecorded(audit.products) === 0) {
+            setError("Please record at least one product before submitting.");
+            setStep(2);
+            return;
+        }
+        setError("");
         setSubmitting(true);
 
         const outlet = {
@@ -159,13 +204,18 @@ export default function NewAudit() {
                         padding: 24,
                     }}
                 >
+                    <ErrorMessage>{error}</ErrorMessage>
+
                     <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
                         {STEP_LABELS.map((label, i) => {
                             const number = i + 1;
                             const active = step >= number;
                             return (
                                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <div
+                                    <button
+                                        type="button"
+                                        onClick={() => goToStep(number)}
+                                        aria-label={`Go to ${label} step`}
                                         style={{
                                             width: 34,
                                             height: 34,
@@ -178,20 +228,31 @@ export default function NewAudit() {
                                             background: active ? B.blue : B.blueFaint,
                                             color: active ? B.white : B.muted,
                                             transition: "all .15s ease",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            fontFamily: "inherit",
+                                            padding: 0,
                                         }}
                                     >
                                         {number}
-                                    </div>
-                                    <span
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => goToStep(number)}
                                         style={{
                                             fontSize: 12,
                                             fontWeight: 600,
                                             color: active ? B.blue : B.muted,
                                             display: window.innerWidth < 480 ? "none" : "inline",
+                                            background: "none",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            fontFamily: "inherit",
+                                            padding: 0,
                                         }}
                                     >
                                         {label}
-                                    </span>
+                                    </button>
                                     {number < 4 && (
                                         <div style={{ width: 20, height: 2, background: B.border, marginLeft: 4 }} />
                                     )}

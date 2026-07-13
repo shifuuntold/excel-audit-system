@@ -178,6 +178,10 @@ export function buildReportData(audits, areaMap) {
     const promotionNo = audits.filter((a) => a.market?.promotion === "No").length;
     const promotionUnspecified = totalOutlets - promotionYes - promotionNo;
 
+    const visitedYes = audits.filter((a) => a.market?.visited === "Yes").length;
+    const visitedNo = audits.filter((a) => a.market?.visited === "No").length;
+    const visitedUnspecified = totalOutlets - visitedYes - visitedNo;
+
     const feedback = audits.map((a) => a.market?.feedback).filter(Boolean);
     const notes = audits.map((a) => a.market?.notes).filter(Boolean);
 
@@ -193,6 +197,9 @@ export function buildReportData(audits, areaMap) {
         promotionYes,
         promotionNo,
         promotionUnspecified,
+        visitedYes,
+        visitedNo,
+        visitedUnspecified,
         feedback,
         notes,
     };
@@ -208,7 +215,7 @@ export function generateNarrativeSections(data, meta) {
     const {
         totalOutlets, outletsWithNoProducts, noProductPct, productPenetration,
         competitorTallyByCategory, distributorTally, promotionYes, promotionNo,
-        promotionUnspecified, feedback,
+        promotionUnspecified, visitedNo, feedback,
     } = data;
 
     const sections = [];
@@ -257,6 +264,9 @@ export function generateNarrativeSections(data, meta) {
     if (promotionNo > promotionYes) {
         observations.push(`Promotional activity was observed in only ${promotionYes} of ${totalOutlets} outlets visited.`);
     }
+    if (visitedNo > 0) {
+        observations.push(`Retailers reported that sales representatives had not visited ${visitedNo} of ${totalOutlets} outlets.`);
+    }
     if (observations.length > 0) {
         sections.push({ heading: "Observations", type: "bullets", items: observations });
     }
@@ -270,21 +280,56 @@ export function generateNarrativeSections(data, meta) {
         ),
     });
 
-    // Competitive Landscape — broken down by product category, matching
-    // how a manually-written field report groups competitors (Water
-    // competitors vs RTD competitors, etc.)
-    sections.push({
-        heading: "Competitive Landscape",
-        type: competitorTallyByCategory.length > 0 ? "bullets" : "paragraph",
-        items: competitorTallyByCategory.length > 0
-            ? competitorTallyByCategory.map(([catKey, names]) => {
-                const label = COMPETITOR_CATEGORY_LABELS[catKey] || "General";
-                const brands = names.map(([name, count]) => `${name} (${count})`).join(", ");
-                return `${label} competitors: ${brands}`;
-            })
-            : undefined,
-        text: competitorTallyByCategory.length === 0 ? "No competitor information was recorded for this period." : undefined,
-    });
+    // Competitive Landscape — narrative intro naming the most contested
+    // categories, then distinct competitor names grouped by category
+    // (matching how a manually-written field report presents this),
+    // with any uncategorized "Other" brands folded into a closing sentence.
+    const categoryEntries = competitorTallyByCategory.filter(([catKey]) => catKey !== "other");
+    const otherEntry = competitorTallyByCategory.find(([catKey]) => catKey === "other");
+
+    if (categoryEntries.length === 0 && !otherEntry) {
+        sections.push({
+            heading: "Competitive Landscape",
+            type: "paragraph",
+            text: "No competitor information was recorded for this period.",
+        });
+    } else {
+        const rankedCategories = [...categoryEntries].sort((a, b) => {
+            const totalA = a[1].reduce((s, [, c]) => s + c, 0);
+            const totalB = b[1].reduce((s, [, c]) => s + c, 0);
+            return totalB - totalA;
+        });
+        const topLabels = rankedCategories.slice(0, 3).map(([catKey]) => COMPETITOR_CATEGORY_LABELS[catKey] || catKey);
+
+        const introParagraphs = [];
+        if (topLabels.length === 1) {
+            introParagraphs.push(`Competition remains strongest in the ${topLabels[0]} category.`);
+        } else if (topLabels.length === 2) {
+            introParagraphs.push(`Competition remains strongest in the ${topLabels[0]} and ${topLabels[1]} categories.`);
+        } else if (topLabels.length >= 3) {
+            introParagraphs.push(`Competition remains strongest in the ${topLabels[0]}, ${topLabels[1]} and ${topLabels[2]} categories.`);
+        }
+        if (categoryEntries.length > 0) {
+            introParagraphs.push("Key competitors observed include:");
+        }
+
+        const groups = categoryEntries
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([catKey, names]) => ({
+                label: COMPETITOR_CATEGORY_LABELS[catKey] || catKey,
+                items: names.map(([name]) => name),
+            }));
+
+        sections.push({
+            heading: "Competitive Landscape",
+            type: "grouped-bullets",
+            introParagraphs,
+            groups,
+            outro: otherEntry
+                ? `Other notable competing brands observed include ${otherEntry[1].map(([name]) => name).join(", ")}.`
+                : undefined,
+        });
+    }
 
     // Distributor Activity
     sections.push({

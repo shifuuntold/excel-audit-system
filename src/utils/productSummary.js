@@ -5,7 +5,10 @@ import {
 
 // Matrix-type groups store keys as "size|flavourKey" -> true
 const MATRIX_GROUPS = {
-    dtt: { label: "Quencher DTT", icon: "🧃", flavours: DTT_FLAVOURS },
+    // "DTD" is the term used in your field reports and competitor
+    // categories for this line — kept as a search alias so it's findable
+    // by either name without changing the display label.
+    dtt: { label: "Quencher DTT", icon: "🧃", flavours: DTT_FLAVOURS, aliases: ["DTD"] },
     rtd: { label: "Quencher RTD", icon: "🧃", flavours: RTD_FLAVOURS },
     champ: { label: "Champ", icon: "🥤", flavours: CHAMP_FLAVOURS },
     gofrut: { label: "GoFrut", icon: "🍹", flavours: GOFRUT_FLAVOURS },
@@ -90,7 +93,7 @@ export function totalProductsRecorded(products) {
 // used by product search/filtering and the reports page so groups with
 // zero hits still show up (e.g. "Champ – not available in any outlet").
 export const ALL_PRODUCT_GROUPS = Object.entries({ ...MATRIX_GROUPS, ...FLAT_GROUPS, ...LABELED_FLAT_GROUPS })
-    .map(([key, meta]) => ({ key, label: meta.label, icon: meta.icon }));
+    .map(([key, meta]) => ({ key, label: meta.label, icon: meta.icon, aliases: meta.aliases || [] }));
 
 /**
  * Returns true if a given audit's products include at least one checked
@@ -103,13 +106,17 @@ export function auditHasProductGroup(products, groupKey) {
 }
 
 /**
- * Finds product groups whose label matches a free-text search term
- * (e.g. "dtd", "champ", "water") — used for the product penetration search.
+ * Finds product groups whose label, key, or known alias matches a
+ * free-text search term (e.g. "dtd", "champ", "water") — used for the
+ * product penetration search.
  */
 export function findMatchingGroups(query) {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return ALL_PRODUCT_GROUPS.filter(
-        (g) => g.label.toLowerCase().includes(q) || g.key.toLowerCase().includes(q)
+        (g) =>
+            g.label.toLowerCase().includes(q) ||
+            g.key.toLowerCase().includes(q) ||
+            g.aliases.some((a) => a.toLowerCase().includes(q))
     );
 }

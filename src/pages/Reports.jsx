@@ -182,6 +182,37 @@ export default function Reports() {
                                         ))}
                                     </ul>
                                 )}
+
+                                {section.type === "grouped-bullets" && (
+                                    <>
+                                        {section.introParagraphs?.map((p, i) => (
+                                            <p key={i} style={{ fontSize: 13.5, color: B.text, lineHeight: 1.7, margin: "0 0 10px" }}>
+                                                {p}
+                                            </p>
+                                        ))}
+
+                                        {section.groups.map((group) => (
+                                            <div key={group.label} style={{ marginBottom: 12 }}>
+                                                <p style={{ fontSize: 13, fontWeight: 700, color: B.blue, margin: "0 0 4px" }}>
+                                                    {group.label}
+                                                </p>
+                                                <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 3 }}>
+                                                    {group.items.map((item) => (
+                                                        <li key={item} style={{ fontSize: 13, color: B.text, lineHeight: 1.5 }}>
+                                                            {item}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        ))}
+
+                                        {section.outro && (
+                                            <p style={{ fontSize: 13.5, color: B.text, lineHeight: 1.7, margin: "10px 0 0" }}>
+                                                {section.outro}
+                                            </p>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         ))}
                     </div>

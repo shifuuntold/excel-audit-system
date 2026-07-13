@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { B, LOGO_URL } from "../config/theme";
+import { B } from "../config/theme";
+import excelLogo from "../assets/excel-logo.png";
 import Button from "../components/common/Button";
 import Input from "../components/common/Input";
 import ErrorMessage from "../components/common/ErrorMessage";
@@ -58,7 +59,7 @@ export default function Login() {
             >
                 <div style={{ textAlign: "center", marginBottom: 28 }}>
                     <img
-                        src={LOGO_URL}
+                        src={excelLogo}
                         alt="Excel Chemicals"
                         style={{ height: 72, maxWidth: "70%", display: "block", margin: "0 auto 16px", objectFit: "contain" }}
                         onError={(e) => { e.target.style.display = "none"; }}
@@ -94,6 +95,13 @@ export default function Login() {
                 <Button type="submit" variant="primary" fullWidth loading={loading} size="lg">
                     {loading ? "Signing in..." : "Sign In"}
                 </Button>
+
+                <p style={{ textAlign: "center", fontSize: 13, color: B.muted, marginTop: 18 }}>
+                    New here?{" "}
+                    <Link to="/signup" style={{ color: B.blue, fontWeight: 600, textDecoration: "none" }}>
+                        Create an account
+                    </Link>
+                </p>
             </form>
         </div>
     );

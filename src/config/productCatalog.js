@@ -93,19 +93,19 @@ export const COMPETITOR_CATEGORIES = [
         key: "water",
         label: "Water",
         productKey: "water",
-        options: ["Eden Waves", "Aquatick", "Dasani", "Keringet", "Glacier", "Highland", "Aquaclear", "Aquabook", "Aqua Creek", "Mt. Kenyan", "Belmont Springs", "Oxyrich", "Aquamist", "Quumist", "Baraka", "Mountain Chill", "Waba"],
+        options: ["Eden Waves", "Aquatick", "Dasani", "Keringet", "Glacier", "Highland", "Aquaclear", "Aquabook", "Aqua Creek", "Mt. Kenyan", "Belmont Springs", "Oxyrich", "Aquamist", "Quumist", "Baraka", "Mountain Chill", "Waba", "Aqua Falls", "Victoria Fresh", "Kenya Springs", "Aquatic Wells", "Mountain Springs", "Lango Water", "Jojah Water"],
     },
     {
         key: "rtd",
         label: "RTD",
         productKey: "rtd",
-        options: ["Minute Maid", "Ukwaju", "Embe", "Jooz", "Afia", "Frutz", "Marchie"],
+        options: ["Minute Maid", "Ukwaju", "Embe", "Jooz", "Afia", "Frutz", "Marchie", "Juo", "UFresh"],
     },
     {
         key: "dc",
         label: "Drinking Chocolate",
         productKey: "dc",
-        options: ["Choco Primo", "Cadbury", "Dairyland", "Miksi", "Twisco"],
+        options: ["Choco Primo", "Cadbury", "Dairyland", "Miksi", "Twisco", "Clovers Cocoa"],
     },
     {
         key: "cocoa",
@@ -117,7 +117,7 @@ export const COMPETITOR_CATEGORIES = [
         key: "tetrapak",
         label: "Tetra Pack (Fruit Full)",
         productKey: "ff",
-        options: ["Pick n Peel", "Suntop", "Ribena", "Del Monte", "Dairy Fresh", "Frosti", "Orchid Valley"],
+        options: ["Pick N Peel", "Sun Top", "Ribena", "Del Monte", "Dairy Fresh", "Frosti", "Orchid Valley", "Acacia Kids"],
     },
     {
         key: "gluc",
@@ -130,5 +130,11 @@ export const COMPETITOR_CATEGORIES = [
         label: "DTD (Quencher DTT)",
         productKey: "dtt",
         options: ["Savannah", "Highlands", "Pep"],
+    },
+    {
+        key: "other",
+        label: "Other / General",
+        productKey: null,
+        options: ["Salang", "Tomtin", "Margbrook", "Everfresh", "Picana", "Chemichemi", "Quench", "Datsan", "Be Fresh"],
     },
 ];

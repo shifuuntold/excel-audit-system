@@ -33,6 +33,27 @@ export async function exportReportToDocx(sections, meta, filename = "field-audit
             }
         }
 
+        if (section.type === "grouped-bullets") {
+            for (const p of section.introParagraphs || []) {
+                children.push(new Paragraph({ children: [new TextRun(p)] }));
+            }
+            for (const group of section.groups) {
+                children.push(new Paragraph({
+                    children: [new TextRun({ text: group.label, bold: true })],
+                    spacing: { before: 100 },
+                }));
+                for (const item of group.items) {
+                    children.push(new Paragraph({ text: item, bullet: { level: 0 } }));
+                }
+            }
+            if (section.outro) {
+                children.push(new Paragraph({
+                    children: [new TextRun(section.outro)],
+                    spacing: { before: 100 },
+                }));
+            }
+        }
+
         children.push(new Paragraph({ text: "" }));
     }
 

@@ -58,6 +58,7 @@ export function exportAuditToPDF(audit, areaMap, filename) {
         startY: doc.lastAutoTable.finalY + 8,
         head: [["Market Information", ""]],
         body: [
+            ["Visited by Sales Rep", audit.market?.visited || "-"],
             ["Distributor", distributorSummaryText(audit.market)],
             ["Promotion Observed", audit.market?.promotion || "-"],
             ["Competitor", competitorSummaryText(audit.market)],
@@ -108,28 +109,32 @@ export function exportAuditsToPDF(audits, areaMap, filename = "audit-summary.pdf
     doc.setTextColor(130, 130, 130);
     doc.text("Tip: tap \"Open Outlet Location\" in a PDF viewer to open that outlet's GPS pin in Google Maps.", 14, 30);
 
+    const locationColIndex = 5;
+
     autoTable(doc, {
         startY: 35,
-        head: [["Submitted", "Outlet", "Area", "Person Met", "Outlet Location"]],
+        head: [["Submitted", "Outlet", "Area", "Person Met", "Visited", "Outlet Location"]],
         body: audits.map((a, i) => [
             fmtDate(a.created_at),
             a.outlet?.shop_name || "-",
             resolveAreaName(a.outlet, areaMap),
             a.outlet?.person_met || "-",
+            a.market?.visited || "-",
             mapsUrls[i] ? "Open Outlet Location" : "No GPS recorded",
         ]),
         theme: "striped",
         headStyles: { fillColor: [0, 48, 135], fontSize: 9 },
-        styles: { fontSize: 9, cellPadding: 5, valign: "middle", overflow: "linebreak" },
+        styles: { fontSize: 9, cellPadding: 4.5, valign: "middle", overflow: "linebreak" },
         columnStyles: {
-            0: { cellWidth: 32 },
-            1: { cellWidth: 46 },
-            2: { cellWidth: 34 },
-            3: { cellWidth: 34 },
-            4: { cellWidth: 36 },
+            0: { cellWidth: 26 },
+            1: { cellWidth: 40 },
+            2: { cellWidth: 28 },
+            3: { cellWidth: 26 },
+            4: { cellWidth: 16, halign: "center" },
+            5: { cellWidth: 36 },
         },
         didParseCell: (data) => {
-            if (data.section === "body" && data.column.index === 4) {
+            if (data.section === "body" && data.column.index === locationColIndex) {
                 if (mapsUrls[data.row.index]) {
                     data.cell.styles.textColor = [26, 79, 160];
                     data.cell.styles.fontStyle = "bold";
@@ -138,9 +143,13 @@ export function exportAuditsToPDF(audits, areaMap, filename = "audit-summary.pdf
                     data.cell.styles.fontStyle = "italic";
                 }
             }
+            if (data.section === "body" && data.column.index === 4) {
+                data.cell.styles.textColor = data.cell.raw === "No" ? [200, 16, 46] : [10, 122, 69];
+                data.cell.styles.fontStyle = "bold";
+            }
         },
         didDrawCell: (data) => {
-            if (data.section === "body" && data.column.index === 4) {
+            if (data.section === "body" && data.column.index === locationColIndex) {
                 const url = mapsUrls[data.row.index];
                 if (url) {
                     doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url });

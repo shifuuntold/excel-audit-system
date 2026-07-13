@@ -5,6 +5,7 @@ import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
 import { summarizeFeedback } from "../services/reportService";
+import { getQueuedAudits } from "../services/offlineQueue";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -14,7 +15,7 @@ import Input from "../components/common/Input";
 import Select from "../components/common/Select";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
-import { ClipboardX, MapPin, User, Clock, FileSpreadsheet, FileText, MessageSquare } from "lucide-react";
+import { ClipboardX, MapPin, User, Clock, FileSpreadsheet, FileText, MessageSquare, CloudUpload } from "lucide-react";
 
 function isoDate(d) {
     return d.toISOString().split("T")[0];
@@ -50,6 +51,14 @@ export default function AuditHistory() {
     const [areaId, setAreaId] = useState("");
     const [search, setSearch] = useState("");
     const [productQuery, setProductQuery] = useState("");
+    const [pendingAudits, setPendingAudits] = useState([]);
+
+    useEffect(() => {
+        function refreshPending() { setPendingAudits(getQueuedAudits()); }
+        refreshPending();
+        window.addEventListener("offline-queue-changed", refreshPending);
+        return () => window.removeEventListener("offline-queue-changed", refreshPending);
+    }, []);
 
     useEffect(() => {
         getAreas().then(setAreas).catch(console.error);
@@ -231,6 +240,65 @@ export default function AuditHistory() {
                         </Button>
                     </div>
                 </div>
+
+                {pendingAudits.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                            <CloudUpload size={15} style={{ color: B.amber }} />
+                            <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0, color: B.text }}>
+                                Pending Sync ({pendingAudits.length})
+                            </h3>
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {pendingAudits.map((item) => (
+                                <div
+                                    key={item.localId}
+                                    style={{
+                                        background: "#FFFBEB",
+                                        borderRadius: 14,
+                                        border: `1.5px dashed ${B.amber}`,
+                                        padding: 16,
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "flex-start",
+                                        gap: 12,
+                                    }}
+                                >
+                                    <div style={{ minWidth: 0 }}>
+                                        <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: B.text }}>
+                                            {item.payload?.outlet?.shop_name || "Unnamed Outlet"}
+                                        </h2>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                                            <MapPin size={12} style={{ color: B.muted }} />
+                                            <p style={{ fontSize: 12.5, color: B.muted, margin: 0 }}>
+                                                {item.payload?.outlet?.area_name || "-"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <span
+                                        style={{
+                                            background: B.amber,
+                                            color: "#fff",
+                                            fontSize: 10.5,
+                                            fontWeight: 700,
+                                            padding: "3px 9px",
+                                            borderRadius: 10,
+                                            flexShrink: 0,
+                                            whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        Saved on device
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <p style={{ fontSize: 11.5, color: B.muted, marginTop: 8 }}>
+                            These were captured offline and will upload automatically once you're back online.
+                        </p>
+                    </div>
+                )}
 
                 {productQuery.trim() && (
                     <div style={{ marginBottom: 20 }}>

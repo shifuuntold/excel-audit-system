@@ -20,6 +20,7 @@ export function exportAuditsToExcel(audits, areaMap, filename = "audit-export.xl
             "Person Met": a.outlet?.person_met || "-",
             "Position": a.outlet?.position || "-",
             "Mobile": a.outlet?.mobile || "-",
+            "Visited by Sales Rep": a.market?.visited || "-",
             "Distributor": distributorSummaryText(a.market),
             "Promotion Observed": a.market?.promotion || "-",
             "Competitor": competitorSummaryText(a.market),
