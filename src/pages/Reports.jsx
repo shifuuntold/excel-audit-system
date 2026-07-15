@@ -29,11 +29,7 @@ export default function Reports() {
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
 
-    const [startDate, setStartDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() - 6);
-        return isoDate(d);
-    });
+    const [startDate, setStartDate] = useState(isoDate(new Date()));
     const [endDate, setEndDate] = useState(isoDate(new Date()));
     const [areaId, setAreaId] = useState("");
 
@@ -158,7 +154,7 @@ export default function Reports() {
                             Field Sales Auditor Report
                         </h1>
                         <p style={{ fontSize: 12.5, color: B.muted, marginBottom: 20 }}>
-                            Area: {areaLabel} · {startDate} to {endDate} · {audits.length} outlets covered
+                            Area: {areaLabel} · {startDate === endDate ? startDate : `${startDate} to ${endDate}`} · {audits.length} outlets covered
                         </p>
 
                         {sections.map((section) => (

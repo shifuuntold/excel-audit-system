@@ -9,29 +9,30 @@ export default function Header({ title, subtitle, backTo, action }) {
     return (
         <div
             style={{
-                background: `linear-gradient(135deg, ${B.blue} 0%, ${B.blueMid} 100%)`,
-                color: B.white,
-                padding: "24px 20px",
-                boxShadow: "0 4px 16px rgba(0,48,135,0.18)",
+                background: B.white,
+                borderBottom: `1px solid ${B.border}`,
+                boxShadow: "0 1px 3px rgba(0,48,135,0.06)",
+                position: "relative",
             }}
         >
             <div
                 style={{
                     maxWidth: 960,
                     margin: "0 auto",
+                    padding: "18px 20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
                     gap: 12,
                 }}
             >
-                <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
                     {backTo && (
                         <button
-                            onClick={() => navigate(backTo)}
+                            onClick={() => (backTo === "-1" ? navigate(-1) : navigate(backTo))}
                             aria-label="Go back"
                             style={{
-                                background: "rgba(255,255,255,0.14)",
+                                background: B.blueFaint,
                                 border: "none",
                                 borderRadius: 999,
                                 width: 36,
@@ -41,7 +42,7 @@ export default function Header({ title, subtitle, backTo, action }) {
                                 alignItems: "center",
                                 justifyContent: "center",
                                 cursor: "pointer",
-                                color: B.white,
+                                color: B.blue,
                             }}
                         >
                             <ArrowLeft size={18} />
@@ -52,23 +53,21 @@ export default function Header({ title, subtitle, backTo, action }) {
                         src={excelLogo}
                         alt="Excel Chemicals"
                         style={{
-                            height: 40,
-                            maxWidth: 130,
+                            height: 46,
+                            maxWidth: 150,
                             objectFit: "contain",
-                            borderRadius: 8,
-                            background: "#fff",
-                            padding: "4px 8px",
                             flexShrink: 0,
                         }}
                         onError={(e) => { e.target.style.display = "none"; }}
                     />
 
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ minWidth: 0, borderLeft: `1.5px solid ${B.border}`, paddingLeft: 14 }}>
                         <h1
                             style={{
-                                fontSize: 22,
-                                fontWeight: 700,
+                                fontSize: 19,
+                                fontWeight: 800,
                                 margin: 0,
+                                color: B.blue,
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -81,8 +80,11 @@ export default function Header({ title, subtitle, backTo, action }) {
                                 style={{
                                     margin: 0,
                                     marginTop: 2,
-                                    fontSize: 13,
-                                    color: "rgba(255,255,255,0.78)",
+                                    fontSize: 12.5,
+                                    color: B.muted,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
                                 }}
                             >
                                 {subtitle}
@@ -93,6 +95,15 @@ export default function Header({ title, subtitle, backTo, action }) {
 
                 {action && <div style={{ flexShrink: 0 }}>{action}</div>}
             </div>
+
+            {/* Signature accent: a hard-edged colour break rather than a
+                smooth gradient, echoing the diagonal cut through the logo. */}
+            <div
+                style={{
+                    height: 3,
+                    background: `linear-gradient(100deg, ${B.blue} 0%, ${B.blue} 78%, ${B.red} 78%, ${B.red} 100%)`,
+                }}
+            />
         </div>
     );
 }

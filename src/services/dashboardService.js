@@ -12,16 +12,25 @@ function daysAgo(n) {
 }
 
 /**
- * Pulls the last 30 days of a rep's audits once and derives every
- * dashboard number from it in memory (today / week / month / trend).
+ * Pulls the last 30 days of audits once and derives every dashboard
+ * number from it in memory (today / week / month / trend). Scoped to
+ * one rep's own audits by default; pass allAudits for the org-wide view
+ * shown to Supervisors and Admins (whose own personal audit count is
+ * often zero, since their role isn't primarily about field auditing).
  */
-export async function getDashboardStats(userId) {
+export async function getDashboardStats(userId, allAudits = false) {
     const today = new Date();
     const todayStr = isoDate(today);
     const startOfMonth = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
     const thirtyDaysAgo = isoDate(daysAgo(29));
 
-    const audits = await getAudits({ userId, startDate: thirtyDaysAgo, endDate: todayStr, limit: 1000 });
+    const audits = await getAudits({
+        userId,
+        allAudits,
+        startDate: thirtyDaysAgo,
+        endDate: todayStr,
+        limit: 1000,
+    });
 
     const todaysAudits = audits.filter((a) => a.created_at.startsWith(todayStr));
     const weeksAudits = audits.filter((a) => a.created_at >= isoDate(daysAgo(6)));
@@ -51,6 +60,8 @@ export async function getDashboardStats(userId) {
     }
     const topArea = Object.entries(areaCounts).sort((a, b) => b[1] - a[1])[0];
 
+    const activeReps = new Set(monthsAudits.map((a) => a.user_id)).size;
+
     return {
         todayCount: todaysAudits.length,
         weekCount: weeksAudits.length,
@@ -59,6 +70,7 @@ export async function getDashboardStats(userId) {
         productsRecordedToday: productsToday,
         last7Days,
         topArea: topArea ? { name: topArea[0], count: topArea[1] } : null,
+        activeReps,
     };
 }
 

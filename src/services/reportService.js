@@ -87,11 +87,55 @@ const FEEDBACK_THEMES = [
         },
     },
     {
+        id: "quality_issue",
+        test: (t) => /\b(expired|expiry|spoilt|spoiled|bad\s+taste|off\s+taste|quality\s+(issue|concern|complaint))\b/i.test(t),
+        phrase: (n, products) => {
+            const productText = products.length ? ` with ${products.join(", ")}` : "";
+            return `${countWord(n)} retailer${n === 1 ? "" : "s"} raised product quality or expiry concerns${productText}.`;
+        },
+    },
+    {
         id: "stock_depleted",
         test: (t) => /(stock|stocks)\b.{0,15}(depleted|finished|sold out|run out|ran out)|out\s+of\s+stock|restock|reorder/i.test(t),
         phrase: (n, products) => {
             const productText = products.length ? `${products.join(" and ")} ` : "";
             return `${countWord(n)} outlet${n === 1 ? "" : "s"} had depleted ${productText}stock${n === 1 ? "" : "s"} and wished to reorder.`;
+        },
+    },
+    {
+        id: "irregular_supply",
+        test: (t) => /\b(irregular|inconsistent|unreliable)\s+(supply|deliver|stock)|supply\s+(is\s+)?(irregular|inconsistent|unreliable)/i.test(t),
+        phrase: (n) => `${countWord(n)} retailer${n === 1 ? "" : "s"} described supply as irregular or unreliable.`,
+    },
+    {
+        id: "pricing_concern",
+        test: (t) => /\b(expensive|costly|pricey|too\s+high\s+a?\s*price|price\s+(is\s+)?(too\s+)?high|reduce\s+the\s+price)\b/i.test(t),
+        phrase: (n, products) => {
+            const productText = products.length ? ` for ${products.join(", ")}` : "";
+            return `${countWord(n)} retailer${n === 1 ? "" : "s"} raised pricing concerns${productText}.`;
+        },
+    },
+    {
+        id: "wants_variety",
+        test: (t) => /\b(more\s+(flavou?rs?|variety|options|sizes)|different\s+flavou?rs?|wider\s+range)\b/i.test(t),
+        phrase: (n) => `${countWord(n)} retailer${n === 1 ? "" : "s"} requested more flavour or size variety.`,
+    },
+    {
+        id: "credit_terms",
+        test: (t) => /\b(credit\s+terms?|on\s+credit|payment\s+terms?|cash\s+only)\b/i.test(t),
+        phrase: (n) => `${countWord(n)} retailer${n === 1 ? "" : "s"} raised credit or payment terms.`,
+    },
+    {
+        id: "wants_rep_contact",
+        test: (t) => /\b(need\s+a\s+rep|want\s+a\s+rep|rep\s+to\s+call|contact\s+(number|details)|assign\s+.{0,10}rep)\b/i.test(t),
+        phrase: (n) => `${countWord(n)} retailer${n === 1 ? "" : "s"} asked for direct sales rep contact or a dedicated rep.`,
+    },
+    {
+        id: "selling_well",
+        test: (t) => /\b(sells?\s+well|fast[- ]moving|popular\s+with\s+customers|customers?\s+(love|like|prefer)\s+(it|this|the))\b/i.test(t),
+        phrase: (n, products) => {
+            const productText = products.length ? ` (${products.join(", ")})` : "";
+            return `${countWord(n)} retailer${n === 1 ? "" : "s"} reported strong customer demand${productText}.`;
         },
     },
     {
@@ -205,6 +249,13 @@ export function buildReportData(audits, areaMap) {
     };
 }
 
+function formatPeriodPhrase(startDate, endDate) {
+    if (!startDate || !endDate) return "the recorded period";
+    const fmt = (d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+    if (startDate === endDate) return `on ${fmt(startDate)}`;
+    return `between ${fmt(startDate)} and ${fmt(endDate)}`;
+}
+
 /**
  * Turns the crunched numbers into narrative sections — the same structure
  * is rendered on-screen and fed into the Word export, so they always match.
@@ -212,10 +263,11 @@ export function buildReportData(audits, areaMap) {
  */
 export function generateNarrativeSections(data, meta) {
     const { areaLabel, startDate, endDate } = meta;
+    const periodPhrase = formatPeriodPhrase(startDate, endDate);
     const {
         totalOutlets, outletsWithNoProducts, noProductPct, productPenetration,
         competitorTallyByCategory, distributorTally, promotionYes, promotionNo,
-        promotionUnspecified, visitedNo, feedback,
+        visitedNo, feedback,
     } = data;
 
     const sections = [];
@@ -224,7 +276,7 @@ export function generateNarrativeSections(data, meta) {
         sections.push({
             heading: "Executive Summary",
             type: "paragraph",
-            text: `No audits were recorded for ${areaLabel} between ${startDate} and ${endDate}.`,
+            text: `No audits were recorded for ${areaLabel} ${periodPhrase}.`,
         });
         return sections;
     }
@@ -234,7 +286,7 @@ export function generateNarrativeSections(data, meta) {
     const lowProducts = productPenetration.filter((p) => p.pct > 0 && p.pct < 25).map((p) => p.label);
 
     // Executive Summary
-    let summary = `A field audit was conducted across ${totalOutlets} retail outlet${totalOutlets === 1 ? "" : "s"} in ${areaLabel} between ${startDate} and ${endDate} to assess product availability, market penetration, competitive activity, distributor presence and retailer feedback.`;
+    let summary = `A field audit was conducted across ${totalOutlets} retail outlet${totalOutlets === 1 ? "" : "s"} in ${areaLabel} ${periodPhrase} to assess product availability, market penetration, competitive activity, distributor presence and retailer feedback.`;
     if (excellentOrGood.length > 0) {
         summary += ` The audit revealed strong penetration for ${excellentOrGood.join(" and ")}.`;
     }
@@ -288,11 +340,7 @@ export function generateNarrativeSections(data, meta) {
     const otherEntry = competitorTallyByCategory.find(([catKey]) => catKey === "other");
 
     if (categoryEntries.length === 0 && !otherEntry) {
-        sections.push({
-            heading: "Competitive Landscape",
-            type: "paragraph",
-            text: "No competitor information was recorded for this period.",
-        });
+        // Nothing recorded — say nothing, rather than calling out the gap.
     } else {
         const rankedCategories = [...categoryEntries].sort((a, b) => {
             const totalA = a[1].reduce((s, [, c]) => s + c, 0);
@@ -331,30 +379,28 @@ export function generateNarrativeSections(data, meta) {
         });
     }
 
-    // Distributor Activity
-    sections.push({
-        heading: "Distributor Activity",
-        type: distributorTally.length > 0 ? "bullets" : "paragraph",
-        items: distributorTally.length > 0
-            ? distributorTally.map(([name, count]) => `${name} — supplying ${count} of ${totalOutlets} outlets visited`)
-            : undefined,
-        text: distributorTally.length === 0
-            ? "No distributor feedback was captured during this audit. Future audits should include distributor information to better understand product supply channels."
-            : undefined,
-    });
+    // Distributor Activity — omitted entirely if nothing was recorded,
+    // rather than calling out the gap
+    if (distributorTally.length > 0) {
+        sections.push({
+            heading: "Distributor Activity",
+            type: "bullets",
+            items: distributorTally.map(([name, count]) => `${name} — supplying ${count} of ${totalOutlets} outlets visited`),
+        });
+    }
 
-    // Promotional Activity
-    const promoParts = [];
-    if (promotionYes > 0) promoParts.push(`Promotional activity was observed in ${promotionYes} of ${totalOutlets} outlets.`);
-    if (promotionNo > 0) promoParts.push(`No promotional activity was observed in ${promotionNo} outlets.`);
-    if (promotionUnspecified > 0) promoParts.push(`Promotion status was not recorded for ${promotionUnspecified} outlet${promotionUnspecified === 1 ? "" : "s"}.`);
-    sections.push({
-        heading: "Promotional Activity",
-        type: "paragraph",
-        text: promoParts.length > 0
-            ? promoParts.join(" ")
-            : "No promotional activity data was recorded during this period.",
-    });
+    // Promotional Activity — only shown if at least one outlet actually
+    // has a recorded answer either way
+    if (promotionYes > 0 || promotionNo > 0) {
+        const promoParts = [];
+        if (promotionYes > 0) promoParts.push(`Promotional activity was observed in ${promotionYes} of ${totalOutlets} outlets.`);
+        if (promotionNo > 0) promoParts.push(`No promotional activity was observed in ${promotionNo} outlets.`);
+        sections.push({
+            heading: "Promotional Activity",
+            type: "paragraph",
+            text: promoParts.join(" "),
+        });
+    }
 
     // Retailer Feedback — grouped into themes, not listed individually
     if (feedback.length > 0) {
@@ -362,11 +408,7 @@ export function generateNarrativeSections(data, meta) {
         const items = [...themeLines];
 
         if (unmatched.length > 0) {
-            if (unmatched.length <= 5) {
-                items.push(...unmatched);
-            } else {
-                items.push(`${unmatched.length} additional retailer comments were recorded that did not fit a common theme.`);
-            }
+            items.push(...unmatched);
         }
 
         if (items.length > 0) {
@@ -384,9 +426,6 @@ export function generateNarrativeSections(data, meta) {
     }
     if (promotionNo > promotionYes) {
         recommendations.push("Introduce promotional activities and point-of-sale materials to improve product visibility.");
-    }
-    if (distributorTally.length === 0) {
-        recommendations.push("Capture distributor information consistently in future audits to better understand supply channels.");
     }
     recommendations.push("Continue monitoring route execution through regular field audits to ensure balanced market coverage.");
     sections.push({ heading: "Recommendations", type: "bullets", items: recommendations });

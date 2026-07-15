@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getDashboardStats } from "../services/dashboardService";
 import { useNavigate } from "react-router-dom";
+import { canViewAllAudits } from "../utils/roles";
 
 import DashboardCard from "../components/dashboard/DashboardCard";
 import StatCard from "../components/dashboard/StatCard";
@@ -20,11 +21,13 @@ import {
     MapPinned,
     Package,
     TrendingUp,
+    Users,
 } from "lucide-react";
 
 export default function Dashboard() {
     const { profile, user } = useAuth();
     const navigate = useNavigate();
+    const orgWide = canViewAllAudits(profile?.role);
 
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -33,7 +36,7 @@ export default function Dashboard() {
         async function loadDashboard() {
             if (!user) return;
             try {
-                const data = await getDashboardStats(user.id);
+                const data = await getDashboardStats(user.id, orgWide);
                 setStats(data);
             } catch (error) {
                 console.error(error);
@@ -43,19 +46,27 @@ export default function Dashboard() {
         }
 
         loadDashboard();
-    }, [user]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, orgWide]);
 
     return (
         <>
             <Header title="Excel Chemicals" subtitle="Field Sales Audit System" />
 
             <PageContainer>
-                <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>
-                    Welcome back, {profile.full_name} 👋
-                </h2>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+                    <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
+                        Welcome back, {profile.full_name} 👋
+                    </h2>
+                    {orgWide && (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: B.blue, background: B.blueFaint, padding: "4px 12px", borderRadius: 20 }}>
+                            Team-wide view
+                        </span>
+                    )}
+                </div>
 
                 {loading ? (
-                    <LoadingSpinner label="Loading your stats..." />
+                    <LoadingSpinner label="Loading stats..." />
                 ) : (
                     <>
                         <div
@@ -67,7 +78,7 @@ export default function Dashboard() {
                             }}
                         >
                             <StatCard
-                                title="Today's Audits"
+                                title={orgWide ? "Team Audits Today" : "Today's Audits"}
                                 value={stats.todayCount}
                                 subtitle={`${stats.weekCount} this week · ${stats.monthCount} this month`}
                                 icon={ClipboardCheck}
@@ -84,12 +95,21 @@ export default function Dashboard() {
                                 icon={MapPinned}
                             />
 
-                            <StatCard
-                                title="Products Logged Today"
-                                value={stats.productsRecordedToday}
-                                subtitle="Across all today's outlets"
-                                icon={Package}
-                            />
+                            {orgWide ? (
+                                <StatCard
+                                    title="Active Auditors"
+                                    value={stats.activeReps}
+                                    subtitle="Submitted at least 1 audit this month"
+                                    icon={Users}
+                                />
+                            ) : (
+                                <StatCard
+                                    title="Products Logged Today"
+                                    value={stats.productsRecordedToday}
+                                    subtitle="Across all today's outlets"
+                                    icon={Package}
+                                />
+                            )}
                         </div>
 
                         <div
@@ -105,7 +125,7 @@ export default function Dashboard() {
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                                 <TrendingUp size={16} style={{ color: B.blue }} />
                                 <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: B.text }}>
-                                    Last 7 Days
+                                    Last 7 Days{orgWide ? " · Whole Team" : ""}
                                 </h3>
                             </div>
                             <TrendChart data={stats.last7Days} />

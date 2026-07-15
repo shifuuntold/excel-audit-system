@@ -1,14 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { getAreas, findOrCreateArea } from "../../services/areaService";
+import { useOnlineStatus } from "../../hooks/useOnlineStatus";
 import Label from "../common/Label";
 import SubLabel from "../common/SubLabel";
 import { B } from "../../config/theme";
-import { Search, MapPin, Loader2, Star } from "lucide-react";
+import { Search, MapPin, Loader2, Star, WifiOff, Check } from "lucide-react";
 
 // Debounced search across (1) your own saved areas and (2) OpenStreetMap's
 // Nominatim geocoder, restricted to Kenya — so a rep can type "Pipeline" or
 // "Utawala" and find it even if it's not in the areas table yet.
+//
+// Works offline too: saved areas come from a local cache when there's no
+// connection, live Kenya-wide search is skipped (it needs network), and a
+// rep can still type a new area name and continue — it gets matched or
+// created for real once the audit syncs back online.
 export default function LocationSearch({ value, onSelect, required }) {
+    const isOnline = useOnlineStatus();
     const [query, setQuery] = useState(value || "");
     const [open, setOpen] = useState(false);
     const [savedAreas, setSavedAreas] = useState([]);
@@ -41,9 +48,13 @@ export default function LocationSearch({ value, onSelect, required }) {
         setQuery(text);
         setOpen(true);
 
+        // Clear whatever was previously selected — typing means the old
+        // selection no longer applies until something new is chosen.
+        onSelect({ area_id: null, area_name: "" });
+
         if (debounceRef.current) clearTimeout(debounceRef.current);
 
-        if (!text.trim() || text.trim().length < 3) {
+        if (!isOnline || !text.trim() || text.trim().length < 3) {
             setRemoteResults([]);
             return;
         }
@@ -70,7 +81,11 @@ export default function LocationSearch({ value, onSelect, required }) {
         a.name.toLowerCase().includes(query.trim().toLowerCase())
     ).slice(0, 5);
 
-    async function pickSaved(area) {
+    const exactSavedMatch = savedAreas.some(
+        (a) => a.name.toLowerCase() === query.trim().toLowerCase()
+    );
+
+    function pickSaved(area) {
         setQuery(area.name);
         setOpen(false);
         onSelect({ area_id: area.id, area_name: area.name });
@@ -96,6 +111,14 @@ export default function LocationSearch({ value, onSelect, required }) {
         }
     }
 
+    // Offline (or the typed name just isn't in the saved list yet) — let
+    // the rep continue with the typed name as-is. It's matched to a real
+    // saved area, or a new one is created, the moment this audit syncs.
+    function useTypedNameAnyway() {
+        setOpen(false);
+        onSelect({ area_id: null, area_name: query.trim() });
+    }
+
     function formatPlaceName(result) {
         const a = result.address || {};
         const parts = [
@@ -104,6 +127,8 @@ export default function LocationSearch({ value, onSelect, required }) {
         ].filter(Boolean);
         return parts.length ? [...new Set(parts)].join(", ") : result.display_name;
     }
+
+    const showTypedOption = query.trim().length > 1 && !exactSavedMatch;
 
     return (
         <div ref={boxRef} style={{ position: "relative", marginBottom: 16 }}>
@@ -131,9 +156,15 @@ export default function LocationSearch({ value, onSelect, required }) {
                 )}
             </div>
 
-            <SubLabel>Search finds your saved areas first, then Kenya-wide locations.</SubLabel>
+            {isOnline ? (
+                <SubLabel>Search finds your saved areas first, then Kenya-wide locations.</SubLabel>
+            ) : (
+                <p style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: B.amber, marginTop: 4, fontWeight: 600 }}>
+                    <WifiOff size={12} /> Offline — showing saved areas only. You can still type a new one.
+                </p>
+            )}
 
-            {open && query.trim().length > 0 && (matchedSaved.length > 0 || remoteResults.length > 0) && (
+            {open && query.trim().length > 0 && (matchedSaved.length > 0 || remoteResults.length > 0 || showTypedOption) && (
                 <div
                     style={{
                         position: "absolute",
@@ -145,7 +176,7 @@ export default function LocationSearch({ value, onSelect, required }) {
                         borderRadius: 12,
                         boxShadow: "0 10px 30px rgba(0,48,135,0.18)",
                         marginTop: 4,
-                        maxHeight: 280,
+                        maxHeight: 320,
                         overflowY: "auto",
                         zIndex: 30,
                     }}
@@ -185,6 +216,20 @@ export default function LocationSearch({ value, onSelect, required }) {
                                     </span>
                                 </button>
                             ))}
+                        </div>
+                    )}
+
+                    {showTypedOption && (
+                        <div>
+                            <p style={{ fontSize: 10, fontWeight: 700, color: B.muted, textTransform: "uppercase", padding: "8px 12px 4px", margin: 0 }}>
+                                {isOnline ? "Not finding it?" : "No connection"}
+                            </p>
+                            <button onClick={useTypedNameAnyway} style={optionStyle}>
+                                <Check size={14} style={{ color: B.green, flexShrink: 0 }} />
+                                <span>
+                                    Use "<strong>{query.trim()}</strong>" as the area
+                                </span>
+                            </button>
                         </div>
                     )}
                 </div>

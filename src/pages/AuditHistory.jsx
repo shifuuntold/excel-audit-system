@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
@@ -38,6 +38,7 @@ const PRESETS = {
 export default function AuditHistory() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const [audits, setAudits] = useState([]);
     const [areas, setAreas] = useState([]);
@@ -45,13 +46,30 @@ export default function AuditHistory() {
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
 
-    const [preset, setPreset] = useState("today");
-    const [startDate, setStartDate] = useState(PRESETS.today().start);
-    const [endDate, setEndDate] = useState(PRESETS.today().end);
-    const [areaId, setAreaId] = useState("");
-    const [search, setSearch] = useState("");
-    const [productQuery, setProductQuery] = useState("");
+    // Filters are seeded from the URL (if present) so that navigating to
+    // an audit's details and back restores exactly what was being viewed,
+    // instead of resetting to "today" every time.
+    const [preset, setPreset] = useState(searchParams.get("preset") ?? "today");
+    const [startDate, setStartDate] = useState(searchParams.get("start") ?? PRESETS.today().start);
+    const [endDate, setEndDate] = useState(searchParams.get("end") ?? PRESETS.today().end);
+    const [areaId, setAreaId] = useState(searchParams.get("area") ?? "");
+    const [search, setSearch] = useState(searchParams.get("q") ?? "");
+    const [productQuery, setProductQuery] = useState(searchParams.get("product") ?? "");
     const [pendingAudits, setPendingAudits] = useState([]);
+
+    useEffect(() => {
+        const next = {};
+        if (preset) next.preset = preset;
+        if (startDate) next.start = startDate;
+        if (endDate) next.end = endDate;
+        if (areaId) next.area = areaId;
+        if (search) next.q = search;
+        if (productQuery) next.product = productQuery;
+        // replace (not push) so every filter tweak doesn't add a new
+        // browser-history entry — there's one History "page" to return to
+        setSearchParams(next, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [preset, startDate, endDate, areaId, search, productQuery]);
 
     useEffect(() => {
         function refreshPending() { setPendingAudits(getQueuedAudits()); }

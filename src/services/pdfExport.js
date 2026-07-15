@@ -110,12 +110,20 @@ export function exportAuditsToPDF(audits, areaMap, filename = "audit-summary.pdf
     doc.text("Tip: tap \"Open Outlet Location\" in a PDF viewer to open that outlet's GPS pin in Google Maps.", 14, 30);
 
     const locationColIndex = 5;
+    const visitedColIndex = 4;
+
+    // Compact date (no year — it's already in the report header above)
+    // so the Submitted column doesn't need to be as wide as the other
+    // columns actually need to breathe.
+    const fmtCompactDate = (iso) => !iso ? "-" : new Date(iso).toLocaleString([], {
+        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+    });
 
     autoTable(doc, {
         startY: 35,
         head: [["Submitted", "Outlet", "Area", "Person Met", "Visited", "Outlet Location"]],
         body: audits.map((a, i) => [
-            fmtDate(a.created_at),
+            fmtCompactDate(a.created_at),
             a.outlet?.shop_name || "-",
             resolveAreaName(a.outlet, areaMap),
             a.outlet?.person_met || "-",
@@ -125,13 +133,17 @@ export function exportAuditsToPDF(audits, areaMap, filename = "audit-summary.pdf
         theme: "striped",
         headStyles: { fillColor: [0, 48, 135], fontSize: 9 },
         styles: { fontSize: 9, cellPadding: 4.5, valign: "middle", overflow: "linebreak" },
+        // Widths verified against actual rendered text at this font/weight/
+        // padding (see notes) — Visited and Outlet Location specifically
+        // sized so their header/link text never wraps onto a second line,
+        // which is what caused the previous "not in a straight line" look.
         columnStyles: {
             0: { cellWidth: 26 },
-            1: { cellWidth: 40 },
-            2: { cellWidth: 28 },
-            3: { cellWidth: 26 },
-            4: { cellWidth: 16, halign: "center" },
-            5: { cellWidth: 36 },
+            1: { cellWidth: 36 },
+            2: { cellWidth: 26 },
+            3: { cellWidth: 24 },
+            4: { cellWidth: 20, halign: "center" },
+            5: { cellWidth: 42 },
         },
         didParseCell: (data) => {
             if (data.section === "body" && data.column.index === locationColIndex) {
@@ -143,8 +155,10 @@ export function exportAuditsToPDF(audits, areaMap, filename = "audit-summary.pdf
                     data.cell.styles.fontStyle = "italic";
                 }
             }
-            if (data.section === "body" && data.column.index === 4) {
-                data.cell.styles.textColor = data.cell.raw === "No" ? [200, 16, 46] : [10, 122, 69];
+            if (data.section === "body" && data.column.index === visitedColIndex) {
+                if (data.cell.raw === "Yes") data.cell.styles.textColor = [10, 122, 69];
+                else if (data.cell.raw === "No") data.cell.styles.textColor = [200, 16, 46];
+                else data.cell.styles.textColor = [160, 160, 160];
                 data.cell.styles.fontStyle = "bold";
             }
         },

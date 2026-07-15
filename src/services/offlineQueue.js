@@ -1,3 +1,5 @@
+import { findOrCreateArea } from "./areaService";
+
 const QUEUE_KEY = "excel_audit_offline_queue_v1";
 
 function readQueue() {
@@ -53,7 +55,8 @@ export async function syncQueue(saveAuditFn) {
 
     for (const item of queue) {
         try {
-            await saveAuditFn(item.payload);
+            const payload = await resolveAreaIfNeeded(item.payload);
+            await saveAuditFn(payload);
             removeFromQueue(item.localId);
             synced++;
         } catch (error) {
@@ -63,4 +66,22 @@ export async function syncQueue(saveAuditFn) {
     }
 
     return { synced, failed };
+}
+
+// An audit captured offline may only have a typed area_name and no real
+// area_id yet (there was no connection to search/save it against the
+// areas table at the time). Resolve that for real now that we're back
+// online, matching an existing area or creating a new one.
+async function resolveAreaIfNeeded(payload) {
+    if (payload.outlet?.area_id || !payload.outlet?.area_name) return payload;
+
+    const area = await findOrCreateArea(payload.outlet.area_name);
+    return {
+        ...payload,
+        outlet: {
+            ...payload.outlet,
+            area_id: area.id,
+            area_name: area.name,
+        },
+    };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildReportData } from "../reportService";
+import { buildReportData, generateNarrativeSections } from "../reportService";
 
 function makeAudit(overrides = {}) {
     return {
@@ -76,5 +76,55 @@ describe("buildReportData", () => {
         expect(data.visitedYes).toBe(1);
         expect(data.visitedNo).toBe(1);
         expect(data.visitedUnspecified).toBe(1);
+    });
+});
+
+describe("generateNarrativeSections", () => {
+    it("uses natural single-day phrasing instead of 'between X and X'", () => {
+        const audits = [makeAudit({ products: { water: { "500ml": true } } })];
+        const data = buildReportData(audits, {});
+        const sections = generateNarrativeSections(data, {
+            areaLabel: "Pipeline",
+            startDate: "2026-07-13",
+            endDate: "2026-07-13",
+        });
+        const summary = sections.find((s) => s.heading === "Executive Summary");
+        expect(summary.text).not.toMatch(/between/i);
+        expect(summary.text).toMatch(/on July 13, 2026/);
+    });
+
+    it("uses a 'between X and Y' range for multi-day periods", () => {
+        const audits = [makeAudit({ products: { water: { "500ml": true } } })];
+        const data = buildReportData(audits, {});
+        const sections = generateNarrativeSections(data, {
+            areaLabel: "Pipeline",
+            startDate: "2026-07-07",
+            endDate: "2026-07-13",
+        });
+        const summary = sections.find((s) => s.heading === "Executive Summary");
+        expect(summary.text).toMatch(/between July 7, 2026 and July 13, 2026/);
+    });
+
+    it("omits Distributor Activity entirely when nothing was recorded, rather than stating the gap", () => {
+        const audits = [makeAudit({ market: {} })];
+        const data = buildReportData(audits, {});
+        const sections = generateNarrativeSections(data, { areaLabel: "Pipeline", startDate: "2026-07-13", endDate: "2026-07-13" });
+        expect(sections.find((s) => s.heading === "Distributor Activity")).toBeUndefined();
+    });
+
+    it("omits Promotional Activity entirely when nothing was recorded either way", () => {
+        const audits = [makeAudit({ market: {} })];
+        const data = buildReportData(audits, {});
+        const sections = generateNarrativeSections(data, { areaLabel: "Pipeline", startDate: "2026-07-13", endDate: "2026-07-13" });
+        expect(sections.find((s) => s.heading === "Promotional Activity")).toBeUndefined();
+    });
+
+    it("still reports Promotional Activity when at least one real answer was recorded", () => {
+        const audits = [makeAudit({ market: { promotion: "No" } })];
+        const data = buildReportData(audits, {});
+        const sections = generateNarrativeSections(data, { areaLabel: "Pipeline", startDate: "2026-07-13", endDate: "2026-07-13" });
+        const promo = sections.find((s) => s.heading === "Promotional Activity");
+        expect(promo).toBeDefined();
+        expect(promo.text).toMatch(/No promotional activity was observed in 1 outlet/);
     });
 });

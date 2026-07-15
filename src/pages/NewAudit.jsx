@@ -61,7 +61,7 @@ export default function NewAudit() {
                 } catch (error) {
                     console.error(error);
                     alert("Couldn't load that audit for editing.");
-                    navigate("/audits/history");
+                    navigate("/audits/history", { replace: true });
                 } finally {
                     if (!cancelled) setLoadingExisting(false);
                 }
@@ -79,8 +79,9 @@ export default function NewAudit() {
     function validateStep(targetStep) {
         if (targetStep === 1) {
             if (!audit.shop_name?.trim()) return "Please enter the shop name.";
-            if (!audit.area_id) return "Please search and select an area.";
+            if (!audit.area_id && !audit.area_name?.trim()) return "Please search and select an area.";
             if (!audit.visit_date) return "Please select a visit date.";
+            if (!audit.latitude || !audit.longitude) return "Please capture the outlet's GPS location.";
         }
         return null;
     }
@@ -147,7 +148,11 @@ export default function NewAudit() {
                 }
                 await updateAudit(editId, { outlet, products: audit.products, market: audit.market });
                 alert("✅ Audit updated successfully!");
-                navigate(`/audit/${editId}`);
+                // replace (not push): the edit form shouldn't linger in
+                // history — one swipe/tap back should return to wherever
+                // you were before you tapped Edit, not bounce through a
+                // stale copy of the form you just saved.
+                navigate(`/audit/${editId}`, { replace: true });
                 return;
             }
 

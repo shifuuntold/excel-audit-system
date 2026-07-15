@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useAudit } from "../../contexts/AuditContext";
 import { POSITIONS } from "../../config/productCatalog";
 
@@ -7,9 +7,10 @@ import CardTitle from "../common/CardTitle";
 import Input from "../common/Input";
 import Select from "../common/Select";
 import Button from "../common/Button";
+import Label from "../common/Label";
 import LocationSearch from "./LocationSearch";
 import { B } from "../../config/theme";
-import { LocateFixed, CheckCircle2 } from "lucide-react";
+import { LocateFixed, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function OutletForm() {
 
@@ -55,15 +56,10 @@ export default function OutletForm() {
         );
     }
 
-    // Auto-capture on arrival so most reps never need to tap the button —
-    // only fires once, and only if we don't already have coordinates
-    // (e.g. when editing an audit that was already GPS-tagged).
-    useEffect(() => {
-        if (!audit.latitude && !audit.longitude) {
-            captureLocation();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    // GPS capture is manual and required — no auto-capture on arrival.
+    // Auto-capturing risked tagging the outlet with wherever the rep
+    // happened to be when the form loaded (e.g. still travelling), rather
+    // than their actual location once at the outlet.
 
     return (
 
@@ -123,40 +119,50 @@ export default function OutletForm() {
                 />
 
                 <div style={{ marginTop: 4, marginBottom: 12 }}>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            flexWrap: "wrap",
-                        }}
-                    >
-                        <Button
-                            variant="secondary"
-                            icon={LocateFixed}
-                            loading={locating}
-                            onClick={captureLocation}
-                        >
-                            {locating ? "Getting location..." : "Capture GPS Location"}
-                        </Button>
+                    <Label required>Outlet GPS Location</Label>
 
-                        {audit.latitude && audit.longitude && (
-                            <span
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: B.green,
-                                }}
-                            >
-                                <CheckCircle2 size={14} />
-                                {audit.latitude.toFixed(5)}, {audit.longitude.toFixed(5)}
+                    {audit.latitude && audit.longitude ? (
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                                flexWrap: "wrap",
+                                background: "#F0FBF6",
+                                border: `1.5px solid ${B.green}`,
+                                borderRadius: 10,
+                                padding: "10px 14px",
+                            }}
+                        >
+                            <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, color: B.green }}>
+                                <CheckCircle2 size={16} />
+                                Captured: {audit.latitude.toFixed(5)}, {audit.longitude.toFixed(5)}
                             </span>
-                        )}
-                    </div>
+                            <Button variant="ghost" size="sm" icon={LocateFixed} loading={locating} onClick={captureLocation}>
+                                Recapture
+                            </Button>
+                        </div>
+                    ) : (
+                        <div
+                            style={{
+                                background: B.redLight,
+                                border: `1.5px solid ${B.red}55`,
+                                borderRadius: 10,
+                                padding: "12px 14px",
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                                <AlertCircle size={16} style={{ color: B.red, flexShrink: 0 }} />
+                                <span style={{ fontSize: 12.5, color: B.text, fontWeight: 500 }}>
+                                    Required — stand at the outlet, then capture its GPS location.
+                                </span>
+                            </div>
+                            <Button variant="primary" icon={LocateFixed} loading={locating} onClick={captureLocation}>
+                                {locating ? "Getting location..." : "Capture GPS Location"}
+                            </Button>
+                        </div>
+                    )}
 
                     {locationError && (
                         <p style={{ color: B.red, fontSize: 12, marginTop: 8 }}>

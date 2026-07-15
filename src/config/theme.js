@@ -19,7 +19,7 @@ export const B = {
 
     border:"#D1DCF0",
 
-    bg:"#F0F4FF",
+    bg:"#F6F7FA",
 
     white:"#FFFFFF",
 

@@ -1,15 +1,43 @@
 import { supabase } from "../lib/supabase";
 
+const AREAS_CACHE_KEY = "excel_audit_areas_cache_v1";
+
+function readAreasCache() {
+    try {
+        const raw = localStorage.getItem(AREAS_CACHE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function writeAreasCache(areas) {
+    try {
+        localStorage.setItem(AREAS_CACHE_KEY, JSON.stringify(areas));
+    } catch {
+        // storage full or unavailable — non-fatal, just means no offline cache
+    }
+}
+
 export async function getAreas() {
+    try {
+        const { data, error } = await supabase
+            .from("areas")
+            .select("*")
+            .order("name");
 
-    const { data, error } = await supabase
-        .from("areas")
-        .select("*")
-        .order("name");
+        if (error) throw error;
 
-    if (error) throw error;
-
-    return data;
+        writeAreasCache(data);
+        return data;
+    } catch (err) {
+        // Offline or request failed — fall back to whatever we last saw,
+        // so a rep who's already loaded the app once can still pick a
+        // known area without a connection.
+        const cached = readAreasCache();
+        if (cached.length > 0) return cached;
+        throw err;
+    }
 }
 
 let _areaMapCache = null;

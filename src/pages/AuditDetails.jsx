@@ -111,7 +111,7 @@ export default function AuditDetails() {
     if (!audit) {
         return (
             <>
-                <Header title="Audit Not Found" backTo="/audits/history" />
+                <Header title="Audit Not Found" backTo="-1" />
                 <PageContainer withNav={false}>
                     <p style={{ color: B.muted, textAlign: "center" }}>
                         This audit could not be found.
@@ -132,7 +132,7 @@ export default function AuditDetails() {
             <Header
                 title={audit.outlet?.shop_name || "Audit Details"}
                 subtitle={new Date(audit.created_at).toLocaleString()}
-                backTo="/audits/history"
+                backTo="-1"
             />
 
             <PageContainer withNav={false}>

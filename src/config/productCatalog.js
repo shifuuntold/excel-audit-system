@@ -131,10 +131,4 @@ export const COMPETITOR_CATEGORIES = [
         productKey: "dtt",
         options: ["Savannah", "Highlands", "Pep"],
     },
-    {
-        key: "other",
-        label: "Other / General",
-        productKey: null,
-        options: ["Salang", "Tomtin", "Margbrook", "Everfresh", "Picana", "Chemichemi", "Quench", "Datsan", "Be Fresh"],
-    },
 ];

@@ -34,6 +34,12 @@ export default function Signup() {
             password,
             options: {
                 data: { full_name: fullName },
+                // Without this, Supabase falls back to the Site URL set in
+                // its dashboard — which defaults to localhost and is easy
+                // to forget to update after deploying. Setting it here
+                // means the confirmation link always lands back on
+                // whatever domain the app is actually running on.
+                emailRedirectTo: window.location.origin,
             },
         });
 
@@ -76,15 +82,38 @@ export default function Signup() {
                         textAlign: "center",
                     }}
                 >
-                    <CheckCircle2 size={36} style={{ color: B.green, margin: "0 auto 14px" }} />
-                    <h1 style={{ fontSize: 20, fontWeight: 700, color: B.text, margin: 0 }}>
+                    <img
+                        src={excelLogo}
+                        alt="Excel Chemicals"
+                        style={{ height: 44, display: "block", margin: "0 auto 20px", objectFit: "contain" }}
+                        onError={(e) => { e.target.style.display = "none"; }}
+                    />
+
+                    <div
+                        style={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: "50%",
+                            background: "#F0FBF6",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            margin: "0 auto 18px",
+                        }}
+                    >
+                        <CheckCircle2 size={30} style={{ color: B.green }} />
+                    </div>
+
+                    <h1 style={{ fontSize: 20, fontWeight: 800, color: B.text, margin: 0 }}>
                         Check your email
                     </h1>
-                    <p style={{ color: B.muted, marginTop: 10, fontSize: 14, lineHeight: 1.6 }}>
-                        We've sent a confirmation link to <strong>{email}</strong>. Confirm your
-                        email, then sign in below.
+                    <p style={{ color: B.muted, marginTop: 10, fontSize: 14, lineHeight: 1.7 }}>
+                        We've sent a confirmation link to<br /><strong style={{ color: B.text }}>{email}</strong>
                     </p>
-                    <Button variant="primary" fullWidth onClick={() => navigate("/")} style={{ marginTop: 20 }}>
+                    <p style={{ color: B.muted, marginTop: 8, fontSize: 12.5, lineHeight: 1.6 }}>
+                        Tap the link to activate your account, then come back here to sign in.
+                    </p>
+                    <Button variant="primary" fullWidth onClick={() => navigate("/")} style={{ marginTop: 22 }}>
                         Go to Sign In
                     </Button>
                 </div>

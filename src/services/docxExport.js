@@ -13,7 +13,7 @@ export async function exportReportToDocx(sections, meta, filename = "field-audit
             heading: HeadingLevel.TITLE,
         }),
         new Paragraph({ text: `Area: ${areaLabel}` }),
-        new Paragraph({ text: `Period: ${startDate} to ${endDate}` }),
+        new Paragraph({ text: `Period: ${startDate === endDate ? startDate : `${startDate} to ${endDate}`}` }),
         new Paragraph({ text: `Generated: ${generatedAt}` }),
         new Paragraph({ text: "" }),
     ];
