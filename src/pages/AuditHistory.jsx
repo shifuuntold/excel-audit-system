@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
+import { getProfileMap } from "../services/profileService";
 import { totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
 import { summarizeFeedback } from "../services/reportService";
 import { getQueuedAudits } from "../services/offlineQueue";
@@ -36,13 +38,15 @@ const PRESETS = {
 };
 
 export default function AuditHistory() {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
+    const orgWide = canViewAllAudits(profile?.role);
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
     const [audits, setAudits] = useState([]);
     const [areas, setAreas] = useState([]);
     const [areaMap, setAreaMap] = useState({});
+    const [profileMap, setProfileMap] = useState({});
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
 
@@ -81,16 +85,22 @@ export default function AuditHistory() {
     useEffect(() => {
         getAreas().then(setAreas).catch(console.error);
         getAreaMap().then(setAreaMap).catch(console.error);
-    }, []);
+        if (orgWide) {
+            getProfileMap().then(setProfileMap).catch(console.error);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orgWide]);
 
     async function loadAudits() {
         setLoading(true);
         try {
             const data = await getAudits({
                 userId: user.id,
+                allAudits: orgWide,
                 startDate: startDate || undefined,
                 endDate: endDate || undefined,
                 areaId: areaId || undefined,
+                limit: orgWide ? 1000 : 200,
             });
             setAudits(data);
         } catch (error) {
@@ -104,7 +114,7 @@ export default function AuditHistory() {
         if (!user) return;
         loadAudits();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user, startDate, endDate, areaId]);
+    }, [user, orgWide, startDate, endDate, areaId]);
 
     function applyPreset(key) {
         setPreset(key);
@@ -164,7 +174,11 @@ export default function AuditHistory() {
 
     return (
         <>
-            <Header title="Audit History" subtitle="Search and filter past audits" backTo="/dashboard" />
+            <Header
+                title="Audit History"
+                subtitle={orgWide ? "Search and filter — all auditors" : "Search and filter past audits"}
+                backTo="/dashboard"
+            />
 
             <PageContainer>
                 <div
@@ -436,9 +450,26 @@ export default function AuditHistory() {
                                     }}
                                 >
                                     <div style={{ minWidth: 0 }}>
-                                        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: B.text }}>
-                                            {audit.outlet?.shop_name || "Unnamed Outlet"}
-                                        </h2>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                            <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: B.text }}>
+                                                {audit.outlet?.shop_name || "Unnamed Outlet"}
+                                            </h2>
+                                            {orgWide && (
+                                                <span
+                                                    style={{
+                                                        background: B.blueFaint,
+                                                        color: B.blue,
+                                                        fontSize: 10.5,
+                                                        fontWeight: 700,
+                                                        padding: "2px 8px",
+                                                        borderRadius: 10,
+                                                        whiteSpace: "nowrap",
+                                                    }}
+                                                >
+                                                    {profileMap[audit.user_id]?.full_name || "Unknown Auditor"}
+                                                </span>
+                                            )}
+                                        </div>
 
                                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
                                             <MapPin size={13} style={{ color: B.muted }} />
