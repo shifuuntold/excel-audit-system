@@ -1,22 +1,28 @@
 import { supabase } from "../lib/supabase";
+import { withOfflineCache } from "../utils/offlineCache";
 
 /**
  * Returns competitors grouped by category: { water: ["Dasani", ...], rtd: [...] }
+ * Falls back to the last-cached result when offline, so custom brands a
+ * rep has seen before (not just the hardcoded starter list) are still
+ * selectable without a connection.
  */
 export async function getCompetitorsByCategory() {
-    const { data, error } = await supabase
-        .from("competitors")
-        .select("*")
-        .order("name");
+    return withOfflineCache("competitors_by_category", async () => {
+        const { data, error } = await supabase
+            .from("competitors")
+            .select("*")
+            .order("name");
 
-    if (error) throw error;
+        if (error) throw error;
 
-    const grouped = {};
-    for (const row of data || []) {
-        if (!grouped[row.category]) grouped[row.category] = [];
-        grouped[row.category].push(row.name);
-    }
-    return grouped;
+        const grouped = {};
+        for (const row of data || []) {
+            if (!grouped[row.category]) grouped[row.category] = [];
+            grouped[row.category].push(row.name);
+        }
+        return grouped;
+    }, {});
 }
 
 /**

@@ -1,9 +1,6 @@
 import { getAudits } from "./auditHistoryService";
 import { totalProductsRecorded } from "../utils/productSummary";
-
-function isoDate(d) {
-    return d.toISOString().split("T")[0];
-}
+import { localIsoDate as isoDate, isOnLocalDate } from "../utils/format";
 
 function daysAgo(n) {
     const d = new Date();
@@ -32,7 +29,7 @@ export async function getDashboardStats(userId, allAudits = false) {
         limit: 1000,
     });
 
-    const todaysAudits = audits.filter((a) => a.created_at.startsWith(todayStr));
+    const todaysAudits = audits.filter((a) => isOnLocalDate(a.created_at, todayStr));
     const weeksAudits = audits.filter((a) => a.created_at >= isoDate(daysAgo(6)));
     const monthsAudits = audits.filter((a) => a.created_at >= startOfMonth);
 
@@ -47,7 +44,7 @@ export async function getDashboardStats(userId, allAudits = false) {
     // last 7 days trend, oldest first
     const last7Days = Array.from({ length: 7 }).map((_, i) => {
         const date = isoDate(daysAgo(6 - i));
-        const count = audits.filter((a) => a.created_at.startsWith(date)).length;
+        const count = audits.filter((a) => isOnLocalDate(a.created_at, date)).length;
         return { date, count };
     });
 

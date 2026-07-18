@@ -5,6 +5,7 @@ import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { getProfileMap } from "../services/profileService";
+import { localIsoDate as isoDate, isOnLocalDate } from "../utils/format";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -20,8 +21,6 @@ import {
     Users, MapPinned, ClipboardCheck, TrendingUp, Megaphone,
     FileSpreadsheet, FileText, Lock,
 } from "lucide-react";
-
-function isoDate(d) { return d.toISOString().split("T")[0]; }
 
 function initials(name) {
     if (!name) return "?";
@@ -69,12 +68,12 @@ export default function SupervisorDashboard() {
     const [profileMap, setProfileMap] = useState({});
     const [loading, setLoading] = useState(true);
 
-    const [startDate, setStartDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() - 6);
-        return isoDate(d);
-    });
-    const [endDate, setEndDate] = useState(isoDate(new Date()));
+    // Defaults to "all time" (no filter) rather than a trailing window —
+    // narrowing the default silently hides historical audits and makes
+    // it look like data or an auditor is missing when it's just outside
+    // the visible range. The date pickers below still let you narrow it.
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
     const [areaId, setAreaId] = useState("");
 
     useEffect(() => {
@@ -141,7 +140,7 @@ export default function SupervisorDashboard() {
                     const d = new Date(start);
                     d.setDate(d.getDate() + i);
                     const dateStr = isoDate(d);
-                    return { date: dateStr, count: audits.filter((a) => a.created_at.startsWith(dateStr)).length };
+                    return { date: dateStr, count: audits.filter((a) => isOnLocalDate(a.created_at, dateStr)).length };
                 });
             }
         }
@@ -249,26 +248,30 @@ export default function SupervisorDashboard() {
                             <StatCard title="Promotions Observed" value={stats.promotionYes} subtitle={`${stats.visitedNo} outlets not visited by reps`} icon={Megaphone} />
                         </div>
 
-                        {stats.trend.length > 0 && (
-                            <div
-                                style={{
-                                    background: B.white,
-                                    borderRadius: 16,
-                                    border: `1px solid ${B.blueLight}`,
-                                    boxShadow: "0 2px 14px rgba(0,48,135,0.07)",
-                                    padding: 20,
-                                    marginBottom: 20,
-                                }}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                                    <TrendingUp size={16} style={{ color: B.blue }} />
-                                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: B.text }}>
-                                        Audits Over Time · Whole Team
-                                    </h3>
-                                </div>
-                                <TrendChart data={stats.trend} />
+                        <div
+                            style={{
+                                background: B.white,
+                                borderRadius: 16,
+                                border: `1px solid ${B.blueLight}`,
+                                boxShadow: "0 2px 14px rgba(0,48,135,0.07)",
+                                padding: 20,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                                <TrendingUp size={16} style={{ color: B.blue }} />
+                                <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: B.text }}>
+                                    Audits Over Time · Whole Team
+                                </h3>
                             </div>
-                        )}
+                            {stats.trend.length > 0 ? (
+                                <TrendChart data={stats.trend} />
+                            ) : (
+                                <p style={{ fontSize: 12.5, color: B.muted, margin: 0 }}>
+                                    Pick a From/To date range of 21 days or fewer above to see the day-by-day trend here.
+                                </p>
+                            )}
+                        </div>
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
                             <div style={{ background: B.white, borderRadius: 16, border: `1px solid ${B.blueLight}`, boxShadow: "0 2px 14px rgba(0,48,135,0.07)", padding: 20 }}>

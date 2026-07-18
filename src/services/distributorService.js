@@ -1,14 +1,17 @@
 import { supabase } from "../lib/supabase";
+import { withOfflineCache } from "../utils/offlineCache";
 
 export async function getDistributors() {
-    const { data, error } = await supabase
-        .from("distributors")
-        .select("*")
-        .order("name");
+    return withOfflineCache("distributors", async () => {
+        const { data, error } = await supabase
+            .from("distributors")
+            .select("*")
+            .order("name");
 
-    if (error) throw error;
+        if (error) throw error;
 
-    return data;
+        return data;
+    });
 }
 
 /**

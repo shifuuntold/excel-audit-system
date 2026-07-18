@@ -1,7 +1,8 @@
 import { saveAudit, getAuditById, updateAudit } from "../services/auditService";
 import { queueAudit } from "../services/offlineQueue";
 import { useAuth } from "../contexts/AuthContext";
-import { useAudit } from "../contexts/AuditContext";
+import { useAudit, BLANK_AUDIT } from "../contexts/AuditContext";
+import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -15,26 +16,14 @@ import Button from "../components/common/Button";
 import LoadingSpinner from "../components/common/LoadingSpinner";
 import ErrorMessage from "../components/common/ErrorMessage";
 import { B } from "../config/theme";
+import { RotateCcw, X } from "lucide-react";
 
 const STEP_LABELS = ["Outlet", "Products", "Market", "Review"];
-
-const BLANK_AUDIT = {
-    shop_name: "",
-    area_id: "",
-    area_name: "",
-    visit_date: new Date().toISOString().split("T")[0],
-    person_met: "",
-    position: "",
-    mobile: "",
-    latitude: null,
-    longitude: null,
-    products: {},
-    market: {},
-};
+const SWIPE_HINT_KEY = "excel_audit_swipe_hint_dismissed";
 
 export default function NewAudit() {
     const { user } = useAuth();
-    const { audit, setAudit } = useAudit();
+    const { audit, peekDraft, beginDraft, clearDraft } = useAudit();
     const { id: editId } = useParams();
     const navigate = useNavigate();
 
@@ -42,17 +31,35 @@ export default function NewAudit() {
     const [submitting, setSubmitting] = useState(false);
     const [loadingExisting, setLoadingExisting] = useState(!!editId);
     const [error, setError] = useState("");
+    const [draftRestored, setDraftRestored] = useState(false);
+    const [showSwipeHint, setShowSwipeHint] = useState(
+        () => typeof window !== "undefined" && !localStorage.getItem(SWIPE_HINT_KEY)
+    );
 
-    // Load the existing audit into the form when editing, otherwise start blank
+    // Load the draft for this form (new audit, or a specific edit) on
+    // mount. A refresh mid-audit shouldn't lose anything a rep already
+    // typed — so an existing local draft always wins over re-fetching
+    // (which would otherwise clobber in-progress edits with the stale
+    // server copy).
     useEffect(() => {
         let cancelled = false;
 
         async function init() {
+            const key = editId ? `edit:${editId}` : "new";
+            const existingDraft = peekDraft(key);
+
+            if (existingDraft) {
+                beginDraft(key, existingDraft);
+                setDraftRestored(true);
+                setLoadingExisting(false);
+                return;
+            }
+
             if (editId) {
                 try {
                     const existing = await getAuditById(editId);
                     if (cancelled) return;
-                    setAudit({
+                    beginDraft(key, {
                         ...BLANK_AUDIT,
                         ...existing.outlet,
                         products: existing.products || {},
@@ -62,11 +69,12 @@ export default function NewAudit() {
                     console.error(error);
                     alert("Couldn't load that audit for editing.");
                     navigate("/audits/history", { replace: true });
+                    return;
                 } finally {
                     if (!cancelled) setLoadingExisting(false);
                 }
             } else {
-                setAudit(BLANK_AUDIT);
+                beginDraft(key, BLANK_AUDIT);
                 setLoadingExisting(false);
             }
         }
@@ -115,6 +123,32 @@ export default function NewAudit() {
         setStep(targetStep);
     }
 
+    function dismissSwipeHint() {
+        localStorage.setItem(SWIPE_HINT_KEY, "1");
+        setShowSwipeHint(false);
+    }
+
+    const swipeHandlers = useSwipeNavigation({
+        disabled: loadingExisting || submitting,
+        onSwipeLeft: () => {
+            goToStep(Math.min(step + 1, 4));
+            if (showSwipeHint) dismissSwipeHint();
+        },
+        onSwipeRight: () => {
+            goToStep(Math.max(step - 1, 1));
+            if (showSwipeHint) dismissSwipeHint();
+        },
+    });
+
+    function discardDraft() {
+        if (!confirm("Discard your restored draft and start fresh?")) return;
+        clearDraft();
+        const key = editId ? `edit:${editId}` : "new";
+        beginDraft(key, BLANK_AUDIT);
+        setDraftRestored(false);
+        setStep(1);
+    }
+
     async function handleSubmit() {
         const outletError = validateStep(1);
         if (outletError) {
@@ -122,7 +156,7 @@ export default function NewAudit() {
             setStep(1);
             return;
         }
-        
+
         setError("");
         setSubmitting(true);
 
@@ -144,10 +178,12 @@ export default function NewAudit() {
                 // risks clobbering changes someone else made in the meantime.
                 if (!navigator.onLine) {
                     alert("📴 You're offline — editing an existing audit needs a connection. Try again once you're back online.");
+                    setSubmitting(false);
                     return;
                 }
                 await updateAudit(editId, { outlet, products: audit.products, market: audit.market });
                 alert("✅ Audit updated successfully!");
+                clearDraft();
                 // replace (not push): the edit form shouldn't linger in
                 // history — one swipe/tap back should return to wherever
                 // you were before you tapped Edit, not bounce through a
@@ -173,7 +209,8 @@ export default function NewAudit() {
             }
 
             setStep(1);
-            setAudit(BLANK_AUDIT);
+            clearDraft();
+            beginDraft("new", BLANK_AUDIT);
         } catch (error) {
             console.error(error);
             alert("Failed to submit audit.");
@@ -196,15 +233,78 @@ export default function NewAudit() {
 
             <PageContainer withNav={false}>
                 <div
+                    {...swipeHandlers}
                     style={{
                         background: B.white,
                         borderRadius: 18,
                         boxShadow: "0 2px 14px rgba(0,48,135,0.07)",
                         border: `1px solid ${B.blueLight}`,
                         padding: 24,
+                        touchAction: "pan-y",
                     }}
                 >
+                    {draftRestored && (
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                                flexWrap: "wrap",
+                                background: B.blueFaint,
+                                border: `1px solid ${B.blueLight}`,
+                                borderRadius: 10,
+                                padding: "10px 14px",
+                                marginBottom: 18,
+                            }}
+                        >
+                            <span style={{ fontSize: 12.5, color: B.blue, fontWeight: 600 }}>
+                                Restored your in-progress details from before the page refreshed.
+                            </span>
+                            <button
+                                type="button"
+                                onClick={discardDraft}
+                                style={{
+                                    display: "flex", alignItems: "center", gap: 5,
+                                    background: "none", border: "none", color: B.muted,
+                                    fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <RotateCcw size={12} /> Start fresh instead
+                            </button>
+                        </div>
+                    )}
+
                     <ErrorMessage>{error}</ErrorMessage>
+
+                    {showSwipeHint && !draftRestored && (
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                                background: B.blueFaint,
+                                border: `1px solid ${B.blueLight}`,
+                                borderRadius: 10,
+                                padding: "10px 14px",
+                                marginBottom: 18,
+                            }}
+                        >
+                            <span style={{ fontSize: 12.5, color: B.blue, fontWeight: 600 }}>
+                                💡 Tip: swipe left or right to move between steps.
+                            </span>
+                            <button
+                                type="button"
+                                onClick={dismissSwipeHint}
+                                aria-label="Dismiss tip"
+                                style={{ background: "none", border: "none", color: B.muted, cursor: "pointer", flexShrink: 0, display: "flex" }}
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
 
                     <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
                         {STEP_LABELS.map((label, i) => {
@@ -261,10 +361,12 @@ export default function NewAudit() {
                         })}
                     </div>
 
-                    {step === 1 && <OutletForm />}
-                    {step === 2 && <ProductsStep />}
-                    {step === 3 && <MarketStep />}
-                    {step === 4 && <ReviewStep />}
+                    <div key={step} className="eb-step-enter">
+                        {step === 1 && <OutletForm />}
+                        {step === 2 && <ProductsStep />}
+                        {step === 3 && <MarketStep />}
+                        {step === 4 && <ReviewStep />}
+                    </div>
 
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: 32, gap: 12 }}>
                         <Button variant="secondary" onClick={previousStep} disabled={step === 1}>

@@ -4,6 +4,7 @@ import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { buildReportData, generateNarrativeSections } from "../services/reportService";
+import { localIsoDate as isoDate } from "../utils/format";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -14,10 +15,6 @@ import Select from "../components/common/Select";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
 import { FileText, Download } from "lucide-react";
-
-function isoDate(d) {
-    return d.toISOString().split("T")[0];
-}
 
 export default function Reports() {
     const { user, profile } = useAuth();

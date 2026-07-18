@@ -140,3 +140,12 @@ select.eb-input {
 .eb-navlink.active {
   color: var(--brand-blue);
 }
+/* Audit wizard step transition — plays on every step change, whichever
+   way it was triggered (swipe, tap, or the Previous/Next buttons) */
+@keyframes eb-step-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.eb-step-enter {
+  animation: eb-step-enter .22s ease;
+}

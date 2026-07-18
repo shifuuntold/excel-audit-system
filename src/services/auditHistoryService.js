@@ -54,8 +54,3 @@ export async function getAudits({
 
     return data || [];
 }
-
-export async function getTodaysAudits(userId) {
-    const today = new Date().toISOString().split("T")[0];
-    return getAudits({ userId, startDate: today, endDate: today });
-}

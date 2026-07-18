@@ -8,6 +8,7 @@ import { getProfileMap } from "../services/profileService";
 import { totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
 import { summarizeFeedback } from "../services/reportService";
 import { getQueuedAudits } from "../services/offlineQueue";
+import { localIsoDate as isoDate } from "../utils/format";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -18,10 +19,6 @@ import Select from "../components/common/Select";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
 import { ClipboardX, MapPin, User, Clock, FileSpreadsheet, FileText, MessageSquare, CloudUpload } from "lucide-react";
-
-function isoDate(d) {
-    return d.toISOString().split("T")[0];
-}
 
 const PRESETS = {
     today: () => ({ start: isoDate(new Date()), end: isoDate(new Date()) }),
