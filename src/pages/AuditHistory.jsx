@@ -5,7 +5,7 @@ import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { getProfileMap } from "../services/profileService";
-import { totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
+import { buildProductSummary, totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
 import { summarizeFeedback } from "../services/reportService";
 import { getQueuedAudits } from "../services/offlineQueue";
 import { localIsoDate as isoDate } from "../utils/format";
@@ -56,6 +56,11 @@ export default function AuditHistory() {
     const [areaId, setAreaId] = useState(searchParams.get("area") ?? "");
     const [search, setSearch] = useState(searchParams.get("q") ?? "");
     const [productQuery, setProductQuery] = useState(searchParams.get("product") ?? "");
+    const [auditorId, setAuditorId] = useState(searchParams.get("auditor") ?? "");
+    const [visitStatus, setVisitStatus] = useState(searchParams.get("visited") ?? "");
+    const [promotionStatus, setPromotionStatus] = useState(searchParams.get("promotion") ?? "");
+    const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "newest");
+    const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
     const [pendingAudits, setPendingAudits] = useState([]);
 
     useEffect(() => {
@@ -66,11 +71,15 @@ export default function AuditHistory() {
         if (areaId) next.area = areaId;
         if (search) next.q = search;
         if (productQuery) next.product = productQuery;
+        if (auditorId) next.auditor = auditorId;
+        if (visitStatus) next.visited = visitStatus;
+        if (promotionStatus) next.promotion = promotionStatus;
+        if (sortBy !== "newest") next.sort = sortBy;
         // replace (not push) so every filter tweak doesn't add a new
         // browser-history entry — there's one History "page" to return to
         setSearchParams(next, { replace: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [preset, startDate, endDate, areaId, search, productQuery]);
+    }, [preset, startDate, endDate, areaId, search, productQuery, auditorId, visitStatus, promotionStatus, sortBy]);
 
     useEffect(() => {
         function refreshPending() { setPendingAudits(getQueuedAudits()); }
@@ -121,10 +130,26 @@ export default function AuditHistory() {
     }
 
     const filteredAudits = useMemo(() => {
-        if (!search.trim()) return audits;
         const q = search.trim().toLowerCase();
-        return audits.filter((a) => (a.outlet?.shop_name || "").toLowerCase().includes(q));
-    }, [audits, search]);
+        const matches = audits.filter((audit) => {
+            if (auditorId && audit.user_id !== auditorId) return false;
+            if (visitStatus && audit.market?.visited !== visitStatus) return false;
+            if (promotionStatus && audit.market?.promotion !== promotionStatus) return false;
+            if (!q) return true;
+            const searchable = [
+                audit.outlet?.shop_name, audit.outlet?.person_met, resolveAreaName(audit.outlet, areaMap),
+                profileMap[audit.user_id]?.full_name,
+                ...buildProductSummary(audit.products).flatMap((group) => [group.label, ...group.items]),
+            ].filter(Boolean).join(" ").toLowerCase();
+            return searchable.includes(q);
+        });
+        return matches.sort((a, b) => {
+            if (sortBy === "oldest") return new Date(a.created_at) - new Date(b.created_at);
+            if (sortBy === "outlet") return (a.outlet?.shop_name || "").localeCompare(b.outlet?.shop_name || "");
+            if (sortBy === "products") return totalProductsRecorded(b.products) - totalProductsRecorded(a.products);
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+    }, [audits, search, areaMap, profileMap, auditorId, visitStatus, promotionStatus, sortBy]);
 
     const productResults = useMemo(() => {
         const groups = findMatchingGroups(productQuery);
@@ -145,7 +170,7 @@ export default function AuditHistory() {
         });
     }, [audits, productQuery, areaMap]);
 
-    const feedbackSummary = useMemo(() => summarizeFeedback(audits), [audits]);
+    const feedbackSummary = useMemo(() => summarizeFeedback(filteredAudits), [filteredAudits]);
 
     async function handleExportExcel() {
         if (filteredAudits.length === 0) return;
@@ -172,7 +197,7 @@ export default function AuditHistory() {
     return (
         <>
             <Header
-                title="Audit History"
+                title={orgWide ? "Audits" : "My Audit History"}
                 subtitle={orgWide ? "Search and filter — all auditors" : "Search and filter past audits"}
                 backTo="/dashboard"
             />
@@ -234,9 +259,14 @@ export default function AuditHistory() {
                                 <option key={a.id} value={a.id}>{a.name}</option>
                             ))}
                         </Select>
+                        {orgWide && (
+                            <Select label="Auditor" placeholder="All Auditors" value={auditorId} onChange={(e) => setAuditorId(e.target.value)}>
+                                {Object.entries(profileMap).sort(([, a], [, b]) => (a.full_name || "").localeCompare(b.full_name || "")).map(([id, person]) => <option key={id} value={id}>{person.full_name || "Unknown Auditor"}</option>)}
+                            </Select>
+                        )}
                         <Input
-                            label="Search Outlet"
-                            placeholder="Shop name..."
+                            label="Search audits"
+                            placeholder="Outlet, person, area, auditor, product..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
@@ -246,6 +276,30 @@ export default function AuditHistory() {
                             value={productQuery}
                             onChange={(e) => setProductQuery(e.target.value)}
                         />
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                        <button onClick={() => setMoreFiltersOpen((open) => !open)} style={{ border: 0, padding: 0, background: "transparent", color: B.blue, cursor: "pointer", fontWeight: 700, fontSize: 12.5, fontFamily: "inherit" }}>
+                            {moreFiltersOpen ? "Hide additional filters" : "More filters"}
+                        </button>
+                        {moreFiltersOpen && (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 12 }}>
+                                <Select label="Sales Visit" placeholder="All statuses" value={visitStatus} onChange={(e) => setVisitStatus(e.target.value)}>
+                                    <option value="Yes">Previously visited</option>
+                                    <option value="No">Not previously visited</option>
+                                </Select>
+                                <Select label="Promotion" placeholder="All statuses" value={promotionStatus} onChange={(e) => setPromotionStatus(e.target.value)}>
+                                    <option value="Yes">Promotion observed</option>
+                                    <option value="No">No promotion observed</option>
+                                </Select>
+                                <Select label="Sort by" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                                    <option value="newest">Newest first</option>
+                                    <option value="oldest">Oldest first</option>
+                                    <option value="outlet">Outlet name</option>
+                                    <option value="products">Most products recorded</option>
+                                </Select>
+                            </div>
+                        )}
                     </div>
 
                     <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
@@ -480,6 +534,16 @@ export default function AuditHistory() {
                                             <p style={{ fontSize: 13, color: B.muted, margin: 0 }}>
                                                 {audit.outlet?.person_met || "-"}
                                             </p>
+                                        </div>
+
+                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                                            <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 7px", borderRadius: 9, background: audit.market?.visited === "No" ? "#FEF3F2" : B.blueFaint, color: audit.market?.visited === "No" ? "#B42318" : B.blue }}>
+                                                Sales visit: {audit.market?.visited === "Yes" ? "Previously visited" : audit.market?.visited === "No" ? "Not previously visited" : "Not recorded"}
+                                            </span>
+                                            <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 7px", borderRadius: 9, background: audit.market?.promotion === "Yes" ? "#ECFDF3" : B.blueFaint, color: audit.market?.promotion === "Yes" ? "#027A48" : B.blue }}>
+                                                Promotion: {audit.market?.promotion === "Yes" ? "Yes" : audit.market?.promotion === "No" ? "No" : "Not recorded"}
+                                            </span>
+                                            {(audit.market?.distributors?.length || audit.market?.distributor) && <span style={{ fontSize: 10.5, fontWeight: 700, padding: "3px 7px", borderRadius: 9, background: B.blueFaint, color: B.blue }}>Distributor: {(audit.market?.distributors || [audit.market?.distributor]).filter(Boolean).join(", ")}</span>}
                                         </div>
                                     </div>
 

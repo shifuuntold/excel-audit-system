@@ -6,6 +6,9 @@ import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
 import { getProfileMap } from "../services/profileService";
 import { localIsoDate as isoDate, isOnLocalDate } from "../utils/format";
+import { ALL_PRODUCT_GROUPS, auditHasProductGroup, totalProductsRecorded } from "../utils/productSummary";
+import { flattenCompetitors } from "../utils/competitors";
+import { COMPETITOR_CATEGORIES } from "../config/productCatalog";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -56,6 +59,20 @@ function LeaderRow({ label, count, max, rank }) {
     );
 }
 
+const competitorCategoryLabels = Object.fromEntries(COMPETITOR_CATEGORIES.map((category) => [category.key, category.label]));
+
+function SimpleTable({ columns, rows, emptyText = "No data in this range." }) {
+    if (!rows.length) return <p style={{ color: B.muted, fontSize: 13, margin: 0 }}>{emptyText}</p>;
+    return (
+        <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead><tr>{columns.map((column) => <th key={column.key} style={{ textAlign: column.align || "left", color: B.muted, fontWeight: 700, padding: "0 8px 9px", whiteSpace: "nowrap" }}>{column.label}</th>)}</tr></thead>
+                <tbody>{rows.map((row, index) => <tr key={row.id || row.name || index}>{columns.map((column) => <td key={column.key} style={{ padding: "9px 8px", borderTop: `1px solid ${B.border}`, color: B.text, textAlign: column.align || "left", whiteSpace: "nowrap" }}>{row[column.key]}</td>)}</tr>)}</tbody>
+            </table>
+        </div>
+    );
+}
+
 export default function SupervisorDashboard() {
     const { profile } = useAuth();
     const navigate = useNavigate();
@@ -72,8 +89,12 @@ export default function SupervisorDashboard() {
     // narrowing the default silently hides historical audits and makes
     // it look like data or an auditor is missing when it's just outside
     // the visible range. The date pickers below still let you narrow it.
-    const [startDate, setStartDate] = useState("");
-    const [endDate, setEndDate] = useState("");
+    const today = isoDate(new Date());
+    const sevenDaysAgo = (() => { const d = new Date(); d.setDate(d.getDate() - 6); return isoDate(d); })();
+    const monthStart = `${today.slice(0, 8)}01`;
+    const [startDate, setStartDate] = useState(sevenDaysAgo);
+    const [endDate, setEndDate] = useState(today);
+    const [period, setPeriod] = useState("7days");
     const [areaId, setAreaId] = useState("");
 
     useEffect(() => {
@@ -108,25 +129,74 @@ export default function SupervisorDashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupervisor, startDate, endDate, areaId]);
 
+    function setQuickPeriod(nextPeriod) {
+        setPeriod(nextPeriod);
+        if (nextPeriod === "all") { setStartDate(""); setEndDate(""); return; }
+        if (nextPeriod === "month") { setStartDate(monthStart); setEndDate(today); return; }
+        setStartDate(sevenDaysAgo);
+        setEndDate(today);
+    }
+
     const stats = useMemo(() => {
         const repCounts = {};
         const areaCounts = {};
+        const repMetrics = {};
+        const coverageByArea = {};
         let promotionYes = 0;
         let visitedNo = 0;
 
         for (const a of audits) {
             const repName = profileMap[a.user_id]?.full_name || "Unknown Rep";
             repCounts[repName] = (repCounts[repName] || 0) + 1;
+            if (!repMetrics[repName]) repMetrics[repName] = { name: repName, audits: 0, areas: new Set(), products: 0, lastActive: "" };
+            repMetrics[repName].audits++;
+            repMetrics[repName].products += totalProductsRecorded(a.products);
+            if (!repMetrics[repName].lastActive || a.created_at > repMetrics[repName].lastActive) repMetrics[repName].lastActive = a.created_at;
 
             const area = resolveAreaName(a.outlet, areaMap);
             areaCounts[area] = (areaCounts[area] || 0) + 1;
+            repMetrics[repName].areas.add(area);
+            if (!coverageByArea[area]) coverageByArea[area] = { name: area, audits: 0, notVisited: 0 };
+            coverageByArea[area].audits++;
 
             if (a.market?.promotion === "Yes") promotionYes++;
-            if (a.market?.visited === "No") visitedNo++;
+            if (a.market?.visited === "No") { visitedNo++; coverageByArea[area].notVisited++; }
         }
 
         const leaderboard = Object.entries(repCounts).sort((a, b) => b[1] - a[1]);
         const areaLeaderboard = Object.entries(areaCounts).sort((a, b) => b[1] - a[1]);
+        const auditorPerformance = Object.values(repMetrics).map((rep) => ({
+            ...rep,
+            areas: rep.areas.size,
+            lastActive: rep.lastActive ? new Date(rep.lastActive).toLocaleDateString([], { month: "short", day: "numeric" }) : "-",
+        })).sort((a, b) => b.audits - a.audits);
+        const areaCoverage = Object.values(coverageByArea).sort((a, b) => b.notVisited - a.notVisited || b.audits - a.audits);
+        const productAvailability = ALL_PRODUCT_GROUPS.map((product) => {
+            const outlets = audits.filter((audit) => auditHasProductGroup(audit.products, product.key)).length;
+            const penetration = audits.length ? Math.round((outlets / audits.length) * 100) : 0;
+            return { name: product.label, outlets, penetration, status: penetration >= 80 ? "Good" : penetration >= 50 ? "Moderate" : "Poor" };
+        }).sort((a, b) => b.outlets - a.outlets).slice(0, 6);
+        const competitorCounts = {};
+        audits.flatMap((audit) => flattenCompetitors(audit.market)).forEach(({ category, name }) => {
+            const key = category || "general";
+            if (!competitorCounts[key]) competitorCounts[key] = {};
+            competitorCounts[key][name] = (competitorCounts[key][name] || 0) + 1;
+        });
+        const topCompetitors = Object.entries(competitorCounts).map(([category, brands]) => {
+            const [brand, outlets] = Object.entries(brands).sort((a, b) => b[1] - a[1])[0];
+            return { category: competitorCategoryLabels[category] || (category === "general" ? "General" : category), brand, outlets, presence: audits.length ? Math.round((outlets / audits.length) * 100) : 0 };
+        }).sort((a, b) => b.outlets - a.outlets).slice(0, 6);
+        const recentActivity = [...audits].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 6).map((audit) => ({
+            id: audit.id,
+            outlet: audit.outlet?.shop_name || "Unnamed Outlet",
+            area: resolveAreaName(audit.outlet, areaMap),
+            auditor: profileMap[audit.user_id]?.full_name || "Unknown Auditor",
+            time: new Date(audit.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+        }));
+        const alerts = [];
+        if (visitedNo > 0) alerts.push(`${visitedNo} outlet${visitedNo === 1 ? "" : "s"} were not previously visited by a sales representative.`);
+        if (audits.length && promotionYes === 0) alerts.push("No promotional activity was reported in the selected range.");
+        if (audits.length && promotionYes > 0 && (promotionYes / audits.length) < 0.1) alerts.push(`Promotional activity is low at ${Math.round((promotionYes / audits.length) * 100)}% of audited outlets.`);
 
         // day-by-day trend across the selected range, capped so the chart
         // doesn't get unreadably dense for long ranges
@@ -154,6 +224,14 @@ export default function SupervisorDashboard() {
             trend,
             promotionYes,
             visitedNo,
+            visitedYes: audits.filter((a) => a.market?.visited === "Yes").length,
+            registeredAuditors: Object.values(profileMap).filter((p) => p.role === "auditor").length,
+            auditorPerformance,
+            areaCoverage,
+            productAvailability,
+            topCompetitors,
+            recentActivity,
+            alerts,
         };
     }, [audits, profileMap, areaMap, startDate, endDate]);
 
@@ -205,9 +283,14 @@ export default function SupervisorDashboard() {
                         marginBottom: 20,
                     }}
                 >
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                        {[ ["7days", "Last 7 Days"], ["month", "This Month"], ["all", "All Time"] ].map(([key, label]) => (
+                            <button key={key} onClick={() => setQuickPeriod(key)} style={{ padding: "6px 12px", borderRadius: 18, border: `1px solid ${period === key ? B.blue : B.border}`, background: period === key ? B.blue : B.white, color: period === key ? B.white : B.muted, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{label}</button>
+                        ))}
+                    </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-                        <Input label="From" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                        <Input label="To" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                        <Input label="From" type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPeriod("custom"); }} />
+                        <Input label="To" type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPeriod("custom"); }} />
                         <Select label="Area" placeholder="All Areas" value={areaId} onChange={(e) => setAreaId(e.target.value)}>
                             {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </Select>
@@ -235,6 +318,9 @@ export default function SupervisorDashboard() {
                             Export PDF
                         </Button>
                     </div>
+                    <p style={{ margin: "12px 0 0", fontSize: 12, color: B.muted, fontWeight: 600 }}>
+                        Export scope: {startDate && endDate ? `${startDate} to ${endDate}` : "All time"} · {areaId ? "Selected area" : "All areas"}
+                    </p>
                 </div>
 
                 {loading ? (
@@ -243,10 +329,28 @@ export default function SupervisorDashboard() {
                     <>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
                             <StatCard title="Total Audits" value={stats.totalAudits} subtitle="In selected range" icon={ClipboardCheck} />
-                            <StatCard title="Active Auditors" value={stats.activeReps} subtitle="Submitted at least 1 audit" icon={Users} />
+                            <StatCard title="Active Auditors" value={stats.activeReps} subtitle={`Submitted at least 1 audit · ${stats.registeredAuditors} registered`} icon={Users} />
                             <StatCard title="Areas Covered" value={stats.areasCovered} subtitle="Distinct areas visited" icon={MapPinned} />
-                            <StatCard title="Promotions Observed" value={stats.promotionYes} subtitle={`${stats.visitedNo} outlets not visited by reps`} icon={Megaphone} />
+                            <StatCard title="Promotions Observed" value={stats.promotionYes} subtitle={`${stats.promotionYes} of ${stats.totalAudits} outlets reported activity`} icon={Megaphone} />
                         </div>
+
+                        <div style={{ background: B.white, borderRadius: 16, border: `1px solid ${B.blueLight}`, boxShadow: "0 2px 14px rgba(0,48,135,0.07)", padding: 18, marginBottom: 20 }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 10px" }}>Coverage Insights</h3>
+                            <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13 }}>
+                                <span>Previously visited: <strong>{stats.visitedYes}</strong></span>
+                                <span>New / not previously visited: <strong>{stats.visitedNo}</strong></span>
+                                <span>Areas covered: <strong>{stats.areasCovered}</strong></span>
+                            </div>
+                        </div>
+
+                        {stats.alerts.length > 0 && (
+                            <div style={{ background: "#FFFBEB", borderRadius: 16, border: "1px solid #FDE68A", padding: 18, marginBottom: 20 }}>
+                                <h3 style={{ fontSize: 14, fontWeight: 800, margin: "0 0 8px", color: "#92400E" }}>Management Alerts</h3>
+                                <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 5 }}>
+                                    {stats.alerts.map((alert) => <li key={alert} style={{ fontSize: 13, color: "#78350F", lineHeight: 1.5 }}>{alert}</li>)}
+                                </ul>
+                            </div>
+                        )}
 
                         <div
                             style={{
@@ -295,6 +399,57 @@ export default function SupervisorDashboard() {
                                     ))
                                 )}
                             </div>
+                        </div>
+
+                        <div style={{ background: B.white, borderRadius: 16, border: `1px solid ${B.blueLight}`, boxShadow: "0 2px 14px rgba(0,48,135,0.07)", padding: 20, marginTop: 16 }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 16px" }}>Auditor Performance</h3>
+                            <SimpleTable
+                                columns={[{ key: "name", label: "Auditor" }, { key: "audits", label: "Audits", align: "right" }, { key: "areas", label: "Areas", align: "right" }, { key: "products", label: "Products", align: "right" }, { key: "lastActive", label: "Last Active", align: "right" }]}
+                                rows={stats.auditorPerformance}
+                            />
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16, marginTop: 16 }}>
+                            <div style={{ background: B.white, borderRadius: 16, border: `1px solid ${B.blueLight}`, boxShadow: "0 2px 14px rgba(0,48,135,0.07)", padding: 20 }}>
+                                <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 16px" }}>Coverage Gaps by Area</h3>
+                                <SimpleTable
+                                    columns={[{ key: "name", label: "Area" }, { key: "audits", label: "Audits", align: "right" }, { key: "notVisited", label: "Not Previously Visited", align: "right" }]}
+                                    rows={stats.areaCoverage}
+                                />
+                            </div>
+                            <div style={{ background: B.white, borderRadius: 16, border: `1px solid ${B.blueLight}`, boxShadow: "0 2px 14px rgba(0,48,135,0.07)", padding: 20 }}>
+                                <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 16px" }}>Product Availability</h3>
+                                <SimpleTable
+                                    columns={[{ key: "name", label: "Product" }, { key: "outlets", label: "Outlets", align: "right" }, { key: "penetration", label: "Penetration", align: "right" }, { key: "status", label: "Status", align: "right" }]}
+                                    rows={stats.productAvailability.map((product) => ({ ...product, penetration: `${product.penetration}%` }))}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ background: B.white, borderRadius: 16, border: `1px solid ${B.blueLight}`, boxShadow: "0 2px 14px rgba(0,48,135,0.07)", padding: 20, marginTop: 16 }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 16px" }}>Competitive Landscape</h3>
+                            <SimpleTable
+                                columns={[{ key: "category", label: "Category" }, { key: "brand", label: "Top Competitor" }, { key: "outlets", label: "Outlets", align: "right" }, { key: "presence", label: "Presence", align: "right" }]}
+                                rows={stats.topCompetitors.map((competitor) => ({ ...competitor, presence: `${competitor.presence}%` }))}
+                                emptyText="No competitor data recorded in this range."
+                            />
+                        </div>
+
+                        <div style={{ background: B.white, borderRadius: 16, border: `1px solid ${B.blueLight}`, boxShadow: "0 2px 14px rgba(0,48,135,0.07)", padding: 20, marginTop: 16 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                                <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Recent Activity</h3>
+                                <button onClick={() => navigate("/audits/history?preset=all")} style={{ border: 0, background: "transparent", color: B.blue, cursor: "pointer", fontWeight: 700, fontFamily: "inherit", fontSize: 12 }}>View all audits</button>
+                            </div>
+                            {stats.recentActivity.length === 0 ? <p style={{ color: B.muted, fontSize: 13, margin: 0 }}>No recent audits in this range.</p> : (
+                                <div style={{ display: "flex", flexDirection: "column" }}>
+                                    {stats.recentActivity.map((activity) => (
+                                        <button key={activity.id} onClick={() => navigate(`/audit/${activity.id}`)} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", border: 0, borderTop: `1px solid ${B.border}`, padding: "11px 0", background: "transparent", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                                            <span style={{ minWidth: 0 }}><strong style={{ display: "block", fontSize: 13, color: B.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activity.outlet}</strong><span style={{ fontSize: 12, color: B.muted }}>{activity.auditor} · {activity.area}</span></span>
+                                            <span style={{ fontSize: 11.5, color: B.muted, whiteSpace: "nowrap" }}>{activity.time}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </>
                 )}

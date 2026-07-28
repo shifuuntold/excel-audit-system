@@ -1,10 +1,21 @@
-import { Document, Packer, Paragraph, HeadingLevel, TextRun } from "docx";
+import { Document, Packer, Paragraph, HeadingLevel, TextRun, Table, TableCell, TableRow, WidthType } from "docx";
+
+function reportTable(headers, rows) {
+    const makeCell = (text, bold = false) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(text), bold })] })] });
+    return new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+            new TableRow({ children: headers.map((header) => makeCell(header, true)) }),
+            ...rows.map((row) => new TableRow({ children: row.map((value) => makeCell(value)) })),
+        ],
+    });
+}
 
 /**
  * Renders a narrative report (from reportService.generateNarrativeSections)
  * into a downloadable Word document, mirroring a manually-written audit report.
  */
-export async function exportReportToDocx(sections, meta, filename = "field-audit-report.docx") {
+export async function exportReportToDocx(sections, meta, filename = "field-audit-report.docx", reportData) {
     const { areaLabel, startDate, endDate, generatedAt } = meta;
 
     const children = [
@@ -17,6 +28,22 @@ export async function exportReportToDocx(sections, meta, filename = "field-audit
         new Paragraph({ text: `Generated: ${generatedAt}` }),
         new Paragraph({ text: "" }),
     ];
+
+    if (reportData) {
+        const productOutlets = reportData.totalOutlets - reportData.outletsWithNoProducts.length;
+        children.push(new Paragraph({ text: "Key Performance Indicators", heading: HeadingLevel.HEADING_1 }));
+        children.push(reportTable(["Metric", "Result"], [
+            ["Outlets Audited", reportData.totalOutlets],
+            ["Areas Covered", reportData.areaNames.length],
+            ["Outlets With Excel Products", `${productOutlets} (${reportData.totalOutlets ? Math.round((productOutlets / reportData.totalOutlets) * 100) : 0}%)`],
+            ["Outlets Not Previously Visited", `${reportData.visitedNo} (${reportData.totalOutlets ? Math.round((reportData.visitedNo / reportData.totalOutlets) * 100) : 0}%)`],
+            ["Promotional Activity", `${reportData.promotionYes} (${reportData.totalOutlets ? Math.round((reportData.promotionYes / reportData.totalOutlets) * 100) : 0}%)`],
+        ]));
+        children.push(new Paragraph({ text: "" }));
+        children.push(new Paragraph({ text: "Product Availability & Penetration", heading: HeadingLevel.HEADING_1 }));
+        children.push(reportTable(["Product", "Outlets", "Penetration", "Rating"], reportData.productPenetration.map((product) => [product.label, product.count, `${product.pct}%`, product.tier])));
+        children.push(new Paragraph({ text: "" }));
+    }
 
     for (const section of sections) {
         children.push(

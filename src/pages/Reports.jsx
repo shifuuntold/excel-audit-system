@@ -87,7 +87,7 @@ export default function Reports() {
                 startDate,
                 endDate,
                 generatedAt: new Date().toLocaleString(),
-            }, `field-audit-report-${startDate}_to_${endDate}.docx`);
+            }, `field-audit-report-${startDate}_to_${endDate}.docx`, reportData);
         } finally {
             setDownloading(false);
         }
