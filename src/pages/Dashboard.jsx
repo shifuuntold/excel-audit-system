@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { getDashboardStats } from "../services/dashboardService";
 import { useNavigate } from "react-router-dom";
 import { canViewAllAudits } from "../utils/roles";
@@ -10,7 +10,8 @@ import TrendChart from "../components/dashboard/TrendChart";
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
 import BottomNavigation from "../components/layout/BottomNavigation";
-import LoadingSpinner from "../components/common/LoadingSpinner";
+import AIAssistant from "../components/ai/AIAssistant";
+import { SkeletonDashboard } from "../components/common/Skeleton";
 import { B } from "../config/theme";
 
 import {
@@ -46,7 +47,6 @@ export default function Dashboard() {
         }
 
         loadDashboard();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, orgWide]);
 
     return (
@@ -56,17 +56,17 @@ export default function Dashboard() {
             <PageContainer>
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
                     <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
-                        Welcome back, {profile.full_name} 👋
+                        Welcome back, {profile.full_name}
                     </h2>
                     {orgWide && (
                         <span style={{ fontSize: 12, fontWeight: 700, color: B.blue, background: B.blueFaint, padding: "4px 12px", borderRadius: 20 }}>
-                            Team-wide view
+                            Data through {new Date().toLocaleDateString([], { month: "short", day: "numeric" })}
                         </span>
                     )}
                 </div>
 
                 {loading ? (
-                    <LoadingSpinner label="Loading stats..." />
+                    <SkeletonDashboard />
                 ) : (
                     <>
                         <div
@@ -98,7 +98,7 @@ export default function Dashboard() {
                             {orgWide ? (
                                 <StatCard
                                     title="Active Auditors"
-                                    value={stats.activeReps}
+                                    value={stats.registeredAuditors ? `${stats.activeReps} / ${stats.registeredAuditors}` : stats.activeReps}
                                     subtitle="Submitted at least 1 audit this month"
                                     icon={Users}
                                 />
@@ -140,30 +140,37 @@ export default function Dashboard() {
                         gap: 16,
                     }}
                 >
-                    <DashboardCard
-                        title="New Audit"
-                        description="Start a new outlet inspection."
-                        icon={ClipboardPlus}
-                        onClick={() => navigate("/audit/new")}
-                    />
+                    {/* An Admin or Supervisor isn't primarily out auditing outlets, so
+                        starting a new audit isn't a primary action for them the way it
+                        is for a field auditor — keep it off their home screen. */}
+                    {!orgWide && (
+                        <DashboardCard
+                            title="New Audit"
+                            description="Start a new outlet inspection."
+                            icon={ClipboardPlus}
+                            onClick={() => navigate("/audit/new")}
+                        />
+                    )}
 
                     <DashboardCard
                         title="Audit History"
-                        description="Search and filter past audits."
+                        description={orgWide ? "Search and investigate submitted audits." : "Search and filter past audits."}
                         icon={Search}
                         onClick={() => navigate("/audits/history")}
                     />
 
-                    <DashboardCard
-                        title="Today's Audits"
-                        description="View today's completed audits."
-                        icon={ClipboardCheck}
-                        onClick={() => navigate("/audits/history")}
-                    />
+                    {orgWide && (
+                        <DashboardCard
+                            title="Team Dashboard"
+                            description="Coverage, leaderboards, alerts and product penetration."
+                            icon={Users}
+                            onClick={() => navigate("/supervisor")}
+                        />
+                    )}
 
                     <DashboardCard
                         title="Reports"
-                        description="Generate a written field audit report."
+                        description={orgWide ? "Generate management reports and export audit findings." : "Generate a written field audit report."}
                         icon={FileBarChart}
                         onClick={() => navigate("/reports")}
                     />
@@ -171,6 +178,7 @@ export default function Dashboard() {
             </PageContainer>
 
             <BottomNavigation />
+            <AIAssistant pageContext="dashboard" />
         </>
     );
 }

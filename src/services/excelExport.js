@@ -10,10 +10,31 @@ import { COMPETITOR_CATEGORIES } from "../config/productCatalog";
 const categoryLabels = Object.fromEntries(COMPETITOR_CATEGORIES.map((category) => [category.key, category.label]));
 const pct = (value, total) => (total ? Math.round((value / total) * 1000) / 10 : 0);
 
-function appendTable(workbook, name, rows, widths) {
+function appendTable(workbook, name, rows, widths, hyperlinkColumn) {
     const sheet = XLSX.utils.json_to_sheet(rows);
     sheet["!cols"] = widths.map((wch) => ({ wch }));
     if (rows.length) sheet["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: Object.keys(rows[0]).length - 1, r: rows.length } }) };
+
+    // Turns a column's cell text into a real clickable Excel hyperlink
+    // (not just a URL sitting there as text) for any row that has one —
+    // e.g. Location -> Google Maps. json_to_sheet has no concept of
+    // hyperlinks on its own, so this is a post-processing pass using
+    // SheetJS's cell.l = { Target } hyperlink format.
+    if (hyperlinkColumn) {
+        const headers = Object.keys(rows[0] || {});
+        const colIndex = headers.indexOf(hyperlinkColumn.column);
+        if (colIndex !== -1) {
+            rows.forEach((_row, i) => {
+                const url = hyperlinkColumn.urls[i];
+                if (!url) return;
+                const cellRef = XLSX.utils.encode_cell({ r: i + 1, c: colIndex }); // +1 skips the header row
+                if (sheet[cellRef]) {
+                    sheet[cellRef].l = { Target: url, Tooltip: "Open in Google Maps" };
+                }
+            });
+        }
+    }
+
     XLSX.utils.book_append_sheet(workbook, sheet, name);
 }
 
@@ -75,20 +96,27 @@ export function exportAuditsToExcel(audits, areaMap, filename = "audit-report.xl
         { "Visit Type": "Not recorded", Outlets: report.visitedUnspecified, "% of Audits": `${pct(report.visitedUnspecified, report.totalOutlets)}%` },
     ], [38, 14, 16]);
 
+    const locationUrls = [];
     const rawRows = audits.map((audit) => {
         const products = buildProductSummary(audit.products);
         const latitude = audit.outlet?.latitude;
         const longitude = audit.outlet?.longitude;
+        const hasLocation = latitude != null && longitude != null;
+        locationUrls.push(hasLocation ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
         return {
             Submitted: fmtDate(audit.created_at), Outlet: audit.outlet?.shop_name || "-", Area: resolveAreaName(audit.outlet, areaMap),
             "Visit Date": audit.outlet?.visit_date || "-", "Person Met": audit.outlet?.person_met || "-", Position: audit.outlet?.position || "-", Mobile: audit.outlet?.mobile || "-",
             "Visited by Sales Rep": audit.market?.visited || "-", Distributor: distributorSummaryText(audit.market), "Promotion Observed": audit.market?.promotion || "-", Competitor: competitorSummaryText(audit.market),
             "Products Recorded": products.reduce((sum, group) => sum + group.count, 0), "Product Detail": products.map((group) => `${group.label}: ${group.items.join(", ")}`).join(" | "),
-            Feedback: audit.market?.feedback || "-", Notes: audit.market?.notes || "-", Latitude: latitude ?? "-", Longitude: longitude ?? "-",
-            "Google Maps": latitude != null && longitude != null ? `https://www.google.com/maps?q=${latitude},${longitude}` : "-",
+            Feedback: audit.market?.feedback || "-", Notes: audit.market?.notes || "-",
+            Location: hasLocation ? "View on Map" : "No location recorded",
         };
     });
-    appendTable(workbook, "Raw Audit Data", rawRows, Object.keys(rawRows[0] || {}).map((key) => ({ "Product Detail": 60, Competitor: 50, Feedback: 50, Notes: 50, "Google Maps": 48 }[key] || 18)));
+    appendTable(
+        workbook, "Raw Audit Data", rawRows,
+        Object.keys(rawRows[0] || {}).map((key) => ({ "Product Detail": 60, Competitor: 50, Feedback: 50, Notes: 50, Location: 20 }[key] || 18)),
+        { column: "Location", urls: locationUrls }
+    );
     const lowProducts = report.productPenetration.filter((product) => product.pct > 0 && product.pct < 25).slice(0, 5).map((product) => product.label).join(", ");
     appendTable(workbook, "Recommendations", [
         { Priority: "High", Issue: `${report.visitedNo} outlets not previously visited`, Action: "Review route coverage and assign follow-up visits to uncovered outlets.", "Responsible Team": "Sales" },

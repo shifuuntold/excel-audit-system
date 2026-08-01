@@ -1,4 +1,5 @@
 import { getAudits } from "./auditHistoryService";
+import { getAllProfiles } from "./profileService";
 import { totalProductsRecorded } from "../utils/productSummary";
 import { localIsoDate as isoDate, isOnLocalDate } from "../utils/format";
 
@@ -28,6 +29,12 @@ export async function getDashboardStats(userId, allAudits = false) {
         endDate: todayStr,
         limit: 1000,
     });
+
+    // Only needed for the team-wide view (Supervisor/Admin) — an
+    // individual auditor's own dashboard has no use for a roster count.
+    const registeredAuditors = allAudits
+        ? (await getAllProfiles()).filter((p) => p.role === "auditor").length
+        : null;
 
     const todaysAudits = audits.filter((a) => isOnLocalDate(a.created_at, todayStr));
     const weeksAudits = audits.filter((a) => a.created_at >= isoDate(daysAgo(6)));
@@ -68,11 +75,6 @@ export async function getDashboardStats(userId, allAudits = false) {
         last7Days,
         topArea: topArea ? { name: topArea[0], count: topArea[1] } : null,
         activeReps,
+        registeredAuditors,
     };
-}
-
-// kept for backward compatibility with any existing callers
-export async function getTodaysAuditCount(userId) {
-    const stats = await getDashboardStats(userId);
-    return stats.todayCount;
 }

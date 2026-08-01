@@ -29,6 +29,7 @@ export function useOfflineQueue() {
     // auto-sync whenever connectivity returns
     useEffect(() => {
         if (isOnline && queueCount > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             sync();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps

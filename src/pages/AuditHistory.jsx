@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
+import { getDistributors } from "../services/distributorService";
 import { getProfileMap } from "../services/profileService";
 import { buildProductSummary, totalProductsRecorded, findMatchingGroups, auditHasProductGroup } from "../utils/productSummary";
 import { summarizeFeedback } from "../services/reportService";
@@ -13,12 +14,15 @@ import { localIsoDate as isoDate } from "../utils/format";
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
 import BottomNavigation from "../components/layout/BottomNavigation";
-import LoadingSpinner from "../components/common/LoadingSpinner";
+import AIAssistant from "../components/ai/AIAssistant";
+import { SkeletonAuditList } from "../components/common/Skeleton";
 import Input from "../components/common/Input";
 import Select from "../components/common/Select";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
-import { ClipboardX, MapPin, User, Clock, FileSpreadsheet, FileText, MessageSquare, CloudUpload } from "lucide-react";
+import { ClipboardX, MapPin, User, Clock, FileSpreadsheet, FileText, MessageSquare, CloudUpload, ChevronDown } from "lucide-react";
+
+const PAGE_SIZE = 25;
 
 const PRESETS = {
     today: () => ({ start: isoDate(new Date()), end: isoDate(new Date()) }),
@@ -59,9 +63,13 @@ export default function AuditHistory() {
     const [auditorId, setAuditorId] = useState(searchParams.get("auditor") ?? "");
     const [visitStatus, setVisitStatus] = useState(searchParams.get("visited") ?? "");
     const [promotionStatus, setPromotionStatus] = useState(searchParams.get("promotion") ?? "");
+    const [distributorFilter, setDistributorFilter] = useState(searchParams.get("distributor") ?? "");
     const [sortBy, setSortBy] = useState(searchParams.get("sort") ?? "newest");
     const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
     const [pendingAudits, setPendingAudits] = useState([]);
+    const [distributors, setDistributors] = useState([]);
+    const [feedbackExpanded, setFeedbackExpanded] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
     useEffect(() => {
         const next = {};
@@ -74,12 +82,13 @@ export default function AuditHistory() {
         if (auditorId) next.auditor = auditorId;
         if (visitStatus) next.visited = visitStatus;
         if (promotionStatus) next.promotion = promotionStatus;
+        if (distributorFilter) next.distributor = distributorFilter;
         if (sortBy !== "newest") next.sort = sortBy;
         // replace (not push) so every filter tweak doesn't add a new
         // browser-history entry — there's one History "page" to return to
         setSearchParams(next, { replace: true });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [preset, startDate, endDate, areaId, search, productQuery, auditorId, visitStatus, promotionStatus, sortBy]);
+    }, [preset, startDate, endDate, areaId, search, productQuery, auditorId, visitStatus, promotionStatus, distributorFilter, sortBy]);
 
     useEffect(() => {
         function refreshPending() { setPendingAudits(getQueuedAudits()); }
@@ -91,10 +100,10 @@ export default function AuditHistory() {
     useEffect(() => {
         getAreas().then(setAreas).catch(console.error);
         getAreaMap().then(setAreaMap).catch(console.error);
+        getDistributors().then(setDistributors).catch(console.error);
         if (orgWide) {
             getProfileMap().then(setProfileMap).catch(console.error);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orgWide]);
 
     async function loadAudits() {
@@ -118,6 +127,10 @@ export default function AuditHistory() {
 
     useEffect(() => {
         if (!user) return;
+        // loadAudits fetches whenever the filters or user change — that's
+        // the intended data-sync behaviour, so the setState-in-effect it
+        // triggers internally is expected here.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         loadAudits();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, orgWide, startDate, endDate, areaId]);
@@ -135,6 +148,10 @@ export default function AuditHistory() {
             if (auditorId && audit.user_id !== auditorId) return false;
             if (visitStatus && audit.market?.visited !== visitStatus) return false;
             if (promotionStatus && audit.market?.promotion !== promotionStatus) return false;
+            if (distributorFilter) {
+                const names = audit.market?.distributors || (audit.market?.distributor ? [audit.market.distributor] : []);
+                if (!names.includes(distributorFilter)) return false;
+            }
             if (!q) return true;
             const searchable = [
                 audit.outlet?.shop_name, audit.outlet?.person_met, resolveAreaName(audit.outlet, areaMap),
@@ -149,7 +166,7 @@ export default function AuditHistory() {
             if (sortBy === "products") return totalProductsRecorded(b.products) - totalProductsRecorded(a.products);
             return new Date(b.created_at) - new Date(a.created_at);
         });
-    }, [audits, search, areaMap, profileMap, auditorId, visitStatus, promotionStatus, sortBy]);
+    }, [audits, search, areaMap, profileMap, auditorId, visitStatus, promotionStatus, distributorFilter, sortBy]);
 
     const productResults = useMemo(() => {
         const groups = findMatchingGroups(productQuery);
@@ -171,6 +188,28 @@ export default function AuditHistory() {
     }, [audits, productQuery, areaMap]);
 
     const feedbackSummary = useMemo(() => summarizeFeedback(filteredAudits), [filteredAudits]);
+
+    const feedbackComments = useMemo(() => {
+        return filteredAudits
+            .filter((a) => a.market?.feedback)
+            .map((a) => ({
+                id: a.id,
+                text: a.market.feedback,
+                outlet: a.outlet?.shop_name || "Unnamed Outlet",
+                area: resolveAreaName(a.outlet, areaMap),
+                auditor: profileMap[a.user_id]?.full_name,
+                date: new Date(a.created_at).toLocaleDateString([], { month: "short", day: "numeric" }),
+            }))
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+    }, [filteredAudits, areaMap, profileMap]);
+
+    // Collapse pagination back to the first page whenever the result set
+    // changes shape, so you don't end up stranded past the end of a much
+    // shorter, newly-filtered list.
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setVisibleCount(PAGE_SIZE);
+    }, [search, productQuery, auditorId, visitStatus, promotionStatus, distributorFilter, sortBy, startDate, endDate, areaId]);
 
     async function handleExportExcel() {
         if (filteredAudits.length === 0) return;
@@ -292,6 +331,9 @@ export default function AuditHistory() {
                                     <option value="Yes">Promotion observed</option>
                                     <option value="No">No promotion observed</option>
                                 </Select>
+                                <Select label="Distributor" placeholder="All distributors" value={distributorFilter} onChange={(e) => setDistributorFilter(e.target.value)}>
+                                    {distributors.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                </Select>
                                 <Select label="Sort by" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                                     <option value="newest">Newest first</option>
                                     <option value="oldest">Oldest first</option>
@@ -403,8 +445,8 @@ export default function AuditHistory() {
                                     }}
                                 >
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                                        <span style={{ fontSize: 15, fontWeight: 700 }}>
-                                            {group.icon} {group.label}
+                                        <span style={{ fontSize: 15, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}>
+                                            <group.icon size={15} style={{ color: B.blue }} /> {group.label}
                                         </span>
                                         <span style={{ fontSize: 12, fontWeight: 700, color: B.blue, background: B.blueFaint, padding: "3px 10px", borderRadius: 10 }}>
                                             {group.count} of {audits.length} outlets ({group.pct}%)
@@ -438,9 +480,15 @@ export default function AuditHistory() {
                             <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>
                                 Retailer Feedback Summary
                             </h3>
-                            <span style={{ fontSize: 11, color: B.muted, fontWeight: 600 }}>
-                                ({feedbackSummary.total} comment{feedbackSummary.total === 1 ? "" : "s"})
-                            </span>
+                            <button
+                                onClick={() => setFeedbackExpanded((open) => !open)}
+                                style={{ border: 0, background: "transparent", cursor: "pointer", color: B.blue, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 3, padding: 0 }}
+                            >
+                                <span style={{ fontSize: 11, fontWeight: 700 }}>
+                                    ({feedbackSummary.total} comment{feedbackSummary.total === 1 ? "" : "s"})
+                                </span>
+                                <ChevronDown size={13} style={{ transform: feedbackExpanded ? "rotate(180deg)" : "none", transition: "transform .15s ease" }} />
+                            </button>
                         </div>
 
                         {feedbackSummary.themeLines.length === 0 ? (
@@ -456,11 +504,27 @@ export default function AuditHistory() {
                                 ))}
                             </ul>
                         )}
+
+                        {feedbackExpanded && (
+                            <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${B.blueLight}`, display: "flex", flexDirection: "column", gap: 12, maxHeight: 360, overflowY: "auto" }}>
+                                {feedbackComments.map((comment) => (
+                                    <div key={comment.id} style={{ fontSize: 12.5 }}>
+                                        <p style={{ margin: 0, color: B.text, lineHeight: 1.55 }}>
+                                            "{comment.text}"
+                                        </p>
+                                        <p style={{ margin: "4px 0 0", color: B.muted, fontSize: 11 }}>
+                                            {comment.outlet} · {comment.area}
+                                            {comment.auditor ? ` · ${comment.auditor}` : ""} · {comment.date}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 
                 {loading ? (
-                    <LoadingSpinner label="Loading audits..." />
+                    <SkeletonAuditList />
                 ) : filteredAudits.length === 0 ? (
                     <div
                         style={{
@@ -480,13 +544,16 @@ export default function AuditHistory() {
                     <>
                         <p style={{ fontSize: 12, color: B.muted, marginBottom: 10, fontWeight: 600 }}>
                             {filteredAudits.length} audit{filteredAudits.length === 1 ? "" : "s"} found
+                            {filteredAudits.length > PAGE_SIZE && ` · showing 1–${Math.min(visibleCount, filteredAudits.length)}`}
                         </p>
 
                         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                            {filteredAudits.map((audit) => (
+                            {filteredAudits.slice(0, visibleCount).map((audit) => (
                                 <div
                                     key={audit.id}
-                                    onClick={() => navigate(`/audit/${audit.id}`)}
+                                    onClick={() => navigate(`/audit/${audit.id}`, {
+                                        state: { auditIds: filteredAudits.map((a) => a.id) },
+                                    })}
                                     style={{
                                         background: B.white,
                                         borderRadius: 14,
@@ -570,11 +637,20 @@ export default function AuditHistory() {
                                 </div>
                             ))}
                         </div>
+
+                        {visibleCount < filteredAudits.length && (
+                            <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+                                <Button variant="secondary" size="sm" onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
+                                    Load {Math.min(PAGE_SIZE, filteredAudits.length - visibleCount)} more
+                                </Button>
+                            </div>
+                        )}
                     </>
                 )}
             </PageContainer>
 
             <BottomNavigation />
+            <AIAssistant pageContext="history" />
         </>
     );
 }

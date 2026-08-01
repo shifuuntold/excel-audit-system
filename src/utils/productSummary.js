@@ -2,33 +2,38 @@ import {
     DTT_FLAVOURS, RTD_FLAVOURS, CHAMP_FLAVOURS, GOFRUT_FLAVOURS,
     WB_FLAVOURS, FF_FLAVOURS, JP_FLAVOURS,
 } from "../config/productCatalog";
+import {
+    Droplets, CupSoda, GlassWater, Citrus, Clapperboard, Candy,
+    Droplet, Milk, Coffee, Zap, BatteryCharging, Footprints, Package,
+    Box,
+} from "lucide-react";
 
 // Matrix-type groups store keys as "size|flavourKey" -> true
 const MATRIX_GROUPS = {
     // "DTD" is the term used in your field reports and competitor
     // categories for this line — kept as a search alias so it's findable
     // by either name without changing the display label.
-    dtt: { label: "Quencher DTT", icon: "🧃", flavours: DTT_FLAVOURS, aliases: ["DTD"] },
-    rtd: { label: "Quencher RTD", icon: "🧃", flavours: RTD_FLAVOURS },
-    champ: { label: "Champ", icon: "🥤", flavours: CHAMP_FLAVOURS },
-    gofrut: { label: "GoFrut", icon: "🍹", flavours: GOFRUT_FLAVOURS },
-    wb: { label: "Warner Bros", icon: "🎬", flavours: WB_FLAVOURS },
-    jp: { label: "Jelly Pop", icon: "🍬", flavours: JP_FLAVOURS },
+    dtt: { label: "Quencher DTT", icon: Droplets, flavours: DTT_FLAVOURS, aliases: ["DTD"] },
+    rtd: { label: "Quencher RTD", icon: CupSoda, flavours: RTD_FLAVOURS },
+    champ: { label: "Champ", icon: GlassWater, flavours: CHAMP_FLAVOURS },
+    gofrut: { label: "GoFrut", icon: Citrus, flavours: GOFRUT_FLAVOURS },
+    wb: { label: "Warner Bros", icon: Clapperboard, flavours: WB_FLAVOURS },
+    jp: { label: "Jelly Pop", icon: Candy, flavours: JP_FLAVOURS },
 };
 
 // Flat groups store keys as just the size string -> true
 const FLAT_GROUPS = {
-    water: { label: "Quencher Life Water", icon: "💧" },
-    dc: { label: "Raha Drinking Chocolate", icon: "🍫" },
-    cocoa: { label: "Raha Cocoa Powder", icon: "🫙" },
-    gluc: { label: "Excel Glucose", icon: "⚡" },
-    energy: { label: "Energy Drink", icon: "🔋" },
-    reload: { label: "Reload Isotonic", icon: "🏃" },
+    water: { label: "Quencher Life Water", icon: Droplet },
+    dc: { label: "Raha Drinking Chocolate", icon: Milk },
+    cocoa: { label: "Raha Cocoa Powder", icon: Coffee },
+    gluc: { label: "Excel Glucose", icon: Zap },
+    energy: { label: "Energy Drink", icon: BatteryCharging },
+    reload: { label: "Reload Isotonic", icon: Footprints },
 };
 
 // Labeled-flat: keys are a flavour code -> true, needs a lookup for the label
 const LABELED_FLAT_GROUPS = {
-    ff: { label: "Fruit Full", icon: "🍓", flavours: FF_FLAVOURS },
+    ff: { label: "Tetra Pack", icon: Package, flavours: FF_FLAVOURS },
 };
 
 /**
@@ -79,7 +84,7 @@ export function buildProductSummary(products) {
         }
 
         // Unknown/future group: fall back to raw keys so nothing is silently dropped
-        groups.push({ key, label: key, icon: "📦", count: checkedKeys.length, items: checkedKeys.sort() });
+        groups.push({ key, label: key, icon: Box, count: checkedKeys.length, items: checkedKeys.sort() });
     }
 
     return groups.sort((a, b) => b.count - a.count);

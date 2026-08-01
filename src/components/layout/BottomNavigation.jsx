@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { LayoutDashboard, ClipboardPlus, History, FileText, ShieldCheck, Settings, LogOut, MoreHorizontal, X } from "lucide-react";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { canViewAllAudits, isAdmin } from "../../utils/roles";
 import { B } from "../../config/theme";
 

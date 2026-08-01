@@ -7,6 +7,7 @@ import NewAudit from "./pages/NewAudit";
 import AuditHistory from "./pages/AuditHistory";
 import AuditDetails from "./pages/AuditDetails";
 import SupervisorDashboard from "./pages/SupervisorDashboard";
+import CoverageTracker from "./pages/CoverageTracker";
 import Reports from "./pages/Reports";
 import AdminPanel from "./pages/AdminPanel";
 
@@ -74,6 +75,15 @@ export default function App() {
                     element={
                         <ProtectedRoute>
                             <SupervisorDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/supervisor/coverage"
+                    element={
+                        <ProtectedRoute>
+                            <CoverageTracker />
                         </ProtectedRoute>
                     }
                 />

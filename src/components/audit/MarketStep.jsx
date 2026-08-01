@@ -4,7 +4,8 @@ import Toggle from "../common/Toggle";
 import CompetitorPicker from "./CompetitorPicker";
 import DistributorPicker from "./DistributorPicker";
 import Label from "../common/Label";
-import { useAudit } from "../../contexts/AuditContext";
+import { useAudit } from "../../hooks/useAudit";
+import { Store } from "lucide-react";
 
 export default function MarketStep() {
     const { audit, setAudit } = useAudit();
@@ -24,7 +25,7 @@ export default function MarketStep() {
 
         <Card>
 
-            <CardTitle icon="🏪">Market Information</CardTitle>
+            <CardTitle icon={Store}>Market Information</CardTitle>
 
             <div style={{ display: "grid", gap: 4 }}>
 

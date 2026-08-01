@@ -1,8 +1,10 @@
 import { saveAudit, getAuditById, updateAudit } from "../services/auditService";
 import { queueAudit } from "../services/offlineQueue";
-import { useAuth } from "../contexts/AuthContext";
-import { useAudit, BLANK_AUDIT } from "../contexts/AuditContext";
+import { useAuth } from "../hooks/useAuth";
+import { useAudit } from "../hooks/useAudit";
+import { BLANK_AUDIT } from "../contexts/auditConstants";
 import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
+import { useShakeToSubmit } from "../hooks/useShakeToSubmit";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -13,10 +15,10 @@ import ReviewStep from "../components/audit/ReviewStep";
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
 import Button from "../components/common/Button";
-import LoadingSpinner from "../components/common/LoadingSpinner";
+import { SkeletonAuditForm } from "../components/common/Skeleton";
 import ErrorMessage from "../components/common/ErrorMessage";
 import { B } from "../config/theme";
-import { RotateCcw, X } from "lucide-react";
+import { RotateCcw, X, Lightbulb, Smartphone } from "lucide-react";
 
 const STEP_LABELS = ["Outlet", "Products", "Market", "Review"];
 const SWIPE_HINT_KEY = "excel_audit_swipe_hint_dismissed";
@@ -177,12 +179,12 @@ export default function NewAudit() {
                 // Edits need a live connection — updating a record offline
                 // risks clobbering changes someone else made in the meantime.
                 if (!navigator.onLine) {
-                    alert("📴 You're offline — editing an existing audit needs a connection. Try again once you're back online.");
+                    alert("You're offline right now, and editing an existing audit needs a connection. Please try again once you're back online.");
                     setSubmitting(false);
                     return;
                 }
                 await updateAudit(editId, { outlet, products: audit.products, market: audit.market });
-                alert("✅ Audit updated successfully!");
+                alert("Your changes have been saved.");
                 clearDraft();
                 // replace (not push): the edit form shouldn't linger in
                 // history — one swipe/tap back should return to wherever
@@ -196,15 +198,15 @@ export default function NewAudit() {
 
             if (!navigator.onLine) {
                 queueAudit(payload);
-                alert("📴 You're offline — audit saved on this device and will sync automatically once you're back online.");
+                alert("You're offline, so this audit has been saved on your device. It'll sync automatically once you're back online.");
             } else {
                 try {
                     await saveAudit(payload);
-                    alert("✅ Audit submitted successfully!");
+                    alert("Audit submitted. Thanks for getting this one done.");
                 } catch {
                     // Save failed (likely a flaky connection) — don't lose the data
                     queueAudit(payload);
-                    alert("⚠️ Couldn't reach the server — audit saved on this device and will sync automatically.");
+                    alert("We couldn't reach the server, so this audit has been saved on your device. It'll sync automatically once the connection is back.");
                 }
             }
 
@@ -213,14 +215,26 @@ export default function NewAudit() {
             beginDraft("new", BLANK_AUDIT);
         } catch (error) {
             console.error(error);
-            alert("Failed to submit audit.");
+            alert("Something went wrong while submitting this audit. Please try again.");
         } finally {
             setSubmitting(false);
         }
     }
 
+    const { shakeToSubmitActive, needsShakePermission, requestShakePermission } = useShakeToSubmit({
+        onShake: handleSubmit,
+        enabled: step === 4 && !submitting && !loadingExisting,
+    });
+
     if (loadingExisting) {
-        return <LoadingSpinner fullScreen label="Loading audit..." />;
+        return (
+            <>
+                <Header title="Edit Outlet Audit" subtitle="Excel Chemicals Field Audit" backTo={editId ? `/audit/${editId}` : "/dashboard"} />
+                <PageContainer withNav={false}>
+                    <SkeletonAuditForm />
+                </PageContainer>
+            </>
+        );
     }
 
     return (
@@ -292,8 +306,9 @@ export default function NewAudit() {
                                 marginBottom: 18,
                             }}
                         >
-                            <span style={{ fontSize: 12.5, color: B.blue, fontWeight: 600 }}>
-                                💡 Tip: swipe left or right to move between steps.
+                            <span style={{ fontSize: 12.5, color: B.blue, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                                <Lightbulb size={14} style={{ flexShrink: 0 }} />
+                                Tip: swipe left or right to move between steps.
                             </span>
                             <button
                                 type="button"
@@ -367,6 +382,45 @@ export default function NewAudit() {
                         {step === 3 && <MarketStep />}
                         {step === 4 && <ReviewStep />}
                     </div>
+
+                    {step === 4 && (needsShakePermission || shakeToSubmitActive) && (
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 12,
+                                flexWrap: "wrap",
+                                background: B.blueFaint,
+                                border: `1px solid ${B.blueLight}`,
+                                borderRadius: 10,
+                                padding: "10px 14px",
+                                marginTop: 18,
+                            }}
+                        >
+                            <span style={{ fontSize: 12.5, color: B.blue, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                                <Smartphone size={14} style={{ flexShrink: 0 }} />
+                                {shakeToSubmitActive
+                                    ? "Everything looks good? Give your phone a shake to submit."
+                                    : "Want to submit with a shake instead of tapping the button?"}
+                            </span>
+                            {needsShakePermission && (
+                                <button
+                                    type="button"
+                                    onClick={requestShakePermission}
+                                    style={{
+                                        display: "flex", alignItems: "center", gap: 5,
+                                        background: "none", border: `1.5px solid ${B.blue}`, color: B.blue,
+                                        borderRadius: 8, padding: "5px 10px",
+                                        fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    Enable shake to submit
+                                </button>
+                            )}
+                        </div>
+                    )}
 
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: 32, gap: 12 }}>
                         <Button variant="secondary" onClick={previousStep} disabled={step === 1}>

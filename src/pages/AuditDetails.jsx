@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 import { supabase } from "../lib/supabase";
 import { deleteAudit } from "../services/auditService";
@@ -7,15 +7,15 @@ import { getAreaMap, resolveAreaName } from "../services/areaService";
 import { buildProductSummary } from "../utils/productSummary";
 import { competitorSummaryText } from "../utils/competitors";
 import { distributorSummaryText } from "../utils/distributors";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { canViewAllAudits } from "../utils/roles";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
-import LoadingSpinner from "../components/common/LoadingSpinner";
+import { SkeletonAuditDetails, SkeletonBlock } from "../components/common/Skeleton";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
-import { FileText, Pencil, Trash2 } from "lucide-react";
+import { FileText, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 
 function Field({ label, value }) {
     return (
@@ -53,6 +53,7 @@ function Section({ title, children }) {
 export default function AuditDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, profile } = useAuth();
 
     const [audit, setAudit] = useState(null);
@@ -60,6 +61,20 @@ export default function AuditDetails() {
     const [loading, setLoading] = useState(true);
     const [deleting, setDeleting] = useState(false);
     const [exportingPdf, setExportingPdf] = useState(false);
+
+    // Comes from AuditHistory when you tap into an audit from a filtered
+    // list — lets you page through that same list with Previous/Next
+    // instead of bouncing back to history every time. Not present on a
+    // direct link (shared URL, browser refresh), in which case the
+    // Previous/Next controls simply don't show.
+    const auditIds = location.state?.auditIds;
+    const currentIndex = auditIds ? auditIds.indexOf(id) : -1;
+    const prevId = currentIndex > 0 ? auditIds[currentIndex - 1] : null;
+    const nextId = currentIndex >= 0 && currentIndex < auditIds.length - 1 ? auditIds[currentIndex + 1] : null;
+
+    function goToAudit(targetId) {
+        navigate(`/audit/${targetId}`, { state: { auditIds } });
+    }
 
     useEffect(() => {
         async function loadAudit() {
@@ -105,7 +120,15 @@ export default function AuditDetails() {
     }
 
     if (loading) {
-        return <LoadingSpinner fullScreen label="Loading audit..." />;
+        return (
+            <>
+                <Header title="Audit Details" subtitle=" " backTo="-1" />
+                <PageContainer withNav={false}>
+                    <SkeletonBlock width={160} height={32} radius={8} style={{ marginBottom: 16 }} />
+                    <SkeletonAuditDetails />
+                </PageContainer>
+            </>
+        );
     }
 
     if (!audit) {
@@ -136,6 +159,42 @@ export default function AuditDetails() {
             />
 
             <PageContainer withNav={false}>
+                {auditIds && auditIds.length > 1 && currentIndex >= 0 && (
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            marginBottom: 16,
+                        }}
+                    >
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={ChevronLeft}
+                            disabled={!prevId}
+                            onClick={() => goToAudit(prevId)}
+                        >
+                            Previous
+                        </Button>
+
+                        <span style={{ fontSize: 12, color: B.muted, fontWeight: 600 }}>
+                            Audit {currentIndex + 1} of {auditIds.length}
+                        </span>
+
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={!nextId}
+                            onClick={() => goToAudit(nextId)}
+                        >
+                            Next
+                            <ChevronRight size={16} />
+                        </Button>
+                    </div>
+                )}
+
                 <Section title="Outlet Information">
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
                         <Field label="Shop Name" value={audit.outlet?.shop_name} />
@@ -169,7 +228,7 @@ export default function AuditDetails() {
                             {summary.map((group) => (
                                 <div key={group.key} style={{ background: B.blueFaint, borderRadius: 12, padding: "12px 14px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                        <span style={{ fontSize: 15 }}>{group.icon}</span>
+                                        <group.icon size={14} style={{ color: B.blue }} />
                                         <span style={{ fontWeight: 700, fontSize: 13, color: B.text }}>{group.label}</span>
                                         <span style={{ fontSize: 11, color: B.muted, fontWeight: 600 }}>({group.count})</span>
                                     </div>

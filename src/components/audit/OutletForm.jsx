@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAudit } from "../../contexts/AuditContext";
+import { useAudit } from "../../hooks/useAudit";
 import { POSITIONS } from "../../config/productCatalog";
 
 import Card from "../common/Card";
@@ -10,7 +10,7 @@ import Button from "../common/Button";
 import Label from "../common/Label";
 import LocationSearch from "./LocationSearch";
 import { B } from "../../config/theme";
-import { LocateFixed, CheckCircle2, AlertCircle } from "lucide-react";
+import { LocateFixed, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
 
 export default function OutletForm() {
 
@@ -65,7 +65,7 @@ export default function OutletForm() {
 
         <Card>
 
-            <CardTitle icon="🏬">Outlet Information</CardTitle>
+            <CardTitle icon={Building2}>Outlet Information</CardTitle>
 
             <div style={{ display: "grid", gap: 4 }}>
 

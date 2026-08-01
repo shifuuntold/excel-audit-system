@@ -1,5 +1,6 @@
 import { memo, useCallback } from "react";
 import { B } from "../../config/theme";
+import { Check } from "lucide-react";
 
 export default memo(function SimpleMatrix({
   label,
@@ -50,9 +51,12 @@ export default memo(function SimpleMatrix({
               fontSize: 11,
               fontWeight: 700,
               padding: "2px 8px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
             }}
           >
-            {total} ✓
+            {total} <Check size={11} strokeWidth={3} />
           </span>
         )}
       </div>
@@ -147,7 +151,7 @@ export default memo(function SimpleMatrix({
                           margin: "auto",
                         }}
                       >
-                        {ck && "✓"}
+                        {ck && <Check size={16} strokeWidth={3} />}
                       </button>
                     </td>
                   );
