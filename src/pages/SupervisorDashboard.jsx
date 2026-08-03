@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
@@ -13,7 +13,8 @@ import { COMPETITOR_CATEGORIES } from "../config/productCatalog";
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
 import BottomNavigation from "../components/layout/BottomNavigation";
-import LoadingSpinner from "../components/common/LoadingSpinner";
+import AIAssistant from "../components/ai/AIAssistant";
+import { SkeletonDashboard } from "../components/common/Skeleton";
 import StatCard from "../components/dashboard/StatCard";
 import TrendChart from "../components/dashboard/TrendChart";
 import Input from "../components/common/Input";
@@ -21,15 +22,9 @@ import Select from "../components/common/Select";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
 import {
-    Users, MapPinned, ClipboardCheck, TrendingUp, Megaphone,
+    Users, MapPinned, ClipboardCheck, TrendingUp, Megaphone, ChevronRight,
     FileSpreadsheet, FileText, Lock,
 } from "lucide-react";
-
-function initials(name) {
-    if (!name) return "?";
-    const parts = name.trim().split(/\s+/);
-    return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase();
-}
 
 function LeaderRow({ label, count, max, rank }) {
     const pct = max ? Math.max((count / max) * 100, 6) : 0;
@@ -102,7 +97,6 @@ export default function SupervisorDashboard() {
         getAreas().then(setAreas).catch(console.error);
         getAreaMap().then(setAreaMap).catch(console.error);
         getProfileMap().then(setProfileMap).catch(console.error);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupervisor]);
 
     async function loadAudits() {
@@ -125,6 +119,7 @@ export default function SupervisorDashboard() {
 
     useEffect(() => {
         if (!isSupervisor) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         loadAudits();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isSupervisor, startDate, endDate, areaId]);
@@ -273,6 +268,37 @@ export default function SupervisorDashboard() {
             <Header title="Team Dashboard" subtitle="Team-wide audit overview" backTo="/dashboard" />
 
             <PageContainer>
+                <button
+                    onClick={() => navigate("/supervisor/coverage")}
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        width: "100%",
+                        background: `linear-gradient(135deg, ${B.blue}, ${B.blueMid})`,
+                        color: "#fff",
+                        border: 0,
+                        borderRadius: 16,
+                        padding: "16px 18px",
+                        marginBottom: 20,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        textAlign: "left",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            <MapPinned size={19} />
+                        </div>
+                        <div>
+                            <p style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>Coverage Tracker</p>
+                            <p style={{ margin: "2px 0 0", fontSize: 12, opacity: 0.85 }}>See which outlets need a follow-up visit today</p>
+                        </div>
+                    </div>
+                    <ChevronRight size={18} style={{ flexShrink: 0, opacity: 0.85 }} />
+                </button>
+
                 <div
                     style={{
                         background: B.white,
@@ -324,7 +350,7 @@ export default function SupervisorDashboard() {
                 </div>
 
                 {loading ? (
-                    <LoadingSpinner label="Loading team data..." />
+                    <SkeletonDashboard />
                 ) : (
                     <>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
@@ -456,6 +482,7 @@ export default function SupervisorDashboard() {
             </PageContainer>
 
             <BottomNavigation />
+            <AIAssistant pageContext="team" />
         </>
     );
 }

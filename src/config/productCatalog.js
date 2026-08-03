@@ -39,7 +39,7 @@ const FF_FLAVOURS = [
 const JP_FLAVOURS = [{k:"S",l:"Strawberry"},{k:"B",l:"Blackcurrant"}];
 const JP_SIZES    = ["30g","50g","65g"];
 
-const WATER_SIZES    = ["200ml","300ml","500ml TP","1L","1.5L","5L","10L","18L"];
+const WATER_SIZES    = ["200ml","300ml","500ml","500ml TP","1L","1.5L","5L","10L","18L"];
 const COCOA_SACHETS  = ["8g","16g","40g"];
 const COCOA_JARS     = ["80g jar","160g jar","320g jar"];
 const DC_SACHETS     = ["8g","16g","50g","100g"];
@@ -115,7 +115,7 @@ export const COMPETITOR_CATEGORIES = [
     },
     {
         key: "tetrapak",
-        label: "Tetra Pack (Fruit Full)",
+        label: "Tetra Pack",
         productKey: "ff",
         options: ["Pick N Peel", "Sun Top", "Ribena", "Del Monte", "Dairy Fresh", "Frosti", "Orchid Valley", "Acacia Kids"],
     },

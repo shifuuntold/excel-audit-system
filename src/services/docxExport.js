@@ -81,6 +81,10 @@ export async function exportReportToDocx(sections, meta, filename = "field-audit
             }
         }
 
+        if (section.type === "table" && section.rows) {
+            children.push(reportTable(section.columns || [], section.rows));
+        }
+
         children.push(new Paragraph({ text: "" }));
     }
 

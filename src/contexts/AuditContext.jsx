@@ -1,24 +1,6 @@
-import { createContext, useCallback, useContext, useRef, useState } from "react";
-import { localIsoDate } from "../utils/format";
-
-const AuditContext = createContext();
-
-export const BLANK_AUDIT = {
-    shop_name: "",
-    area_id: "",
-    area_name: "",
-    visit_date: localIsoDate(),
-
-    person_met: "",
-    position: "",
-    mobile: "",
-
-    latitude: null,
-    longitude: null,
-
-    products: {},
-    market: {},
-};
+import { useCallback, useRef, useState } from "react";
+import { AuditContext } from "./auditContextObject";
+import { BLANK_AUDIT } from "./auditConstants";
 
 const STORAGE_PREFIX = "excel_audit_draft:";
 
@@ -97,8 +79,4 @@ export function AuditProvider({ children }) {
             {children}
         </AuditContext.Provider>
     );
-}
-
-export function useAudit() {
-    return useContext(AuditContext);
 }

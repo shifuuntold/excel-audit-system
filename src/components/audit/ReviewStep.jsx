@@ -1,10 +1,11 @@
 import Card from "../common/Card";
 import CardTitle from "../common/CardTitle";
-import { useAudit } from "../../contexts/AuditContext";
+import { useAudit } from "../../hooks/useAudit";
 import { buildProductSummary } from "../../utils/productSummary";
 import { competitorSummaryText } from "../../utils/competitors";
 import { distributorSummaryText } from "../../utils/distributors";
 import { B } from "../../config/theme";
+import { ClipboardCheck } from "lucide-react";
 
 function Field({ label, value }) {
     return (
@@ -31,7 +32,7 @@ export default function ReviewStep() {
 
         <Card>
 
-            <CardTitle icon="✅">Review Audit</CardTitle>
+            <CardTitle icon={ClipboardCheck}>Review Audit</CardTitle>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
@@ -108,7 +109,7 @@ export default function ReviewStep() {
                                     }}
                                 >
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                        <span style={{ fontSize: 15 }}>{group.icon}</span>
+                                        <group.icon size={14} style={{ color: B.blue }} />
                                         <span style={{ fontWeight: 700, fontSize: 13, color: B.text }}>
                                             {group.label}
                                         </span>

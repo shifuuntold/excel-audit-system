@@ -2,6 +2,7 @@ import { memo, useCallback } from "react";
 
 import { B } from "../../config/theme";
 import { cellOk } from "../../config/productCatalog";
+import { Check } from "lucide-react";
 
 export default memo(function ProductMatrix({
     product,
@@ -55,9 +56,12 @@ export default memo(function ProductMatrix({
                             fontSize: 11,
                             fontWeight: 700,
                             padding: "2px 9px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
                         }}
                     >
-                        {total} ✓
+                        {total} <Check size={11} strokeWidth={3} />
                     </span>
                 )}
             </div>
@@ -187,7 +191,7 @@ export default memo(function ProductMatrix({
                                                             "all 0.12s",
                                                     }}
                                                 >
-                                                    {checkedValue && "✓"}
+                                                    {checkedValue && <Check size={16} strokeWidth={3} />}
                                                 </button>
                                             ) : (
                                                 <div

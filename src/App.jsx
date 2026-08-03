@@ -2,27 +2,32 @@ import { Routes, Route } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import EmailConfirmed from "./pages/EmailConfirmed";
 import Dashboard from "./pages/Dashboard";
 import NewAudit from "./pages/NewAudit";
 import AuditHistory from "./pages/AuditHistory";
 import AuditDetails from "./pages/AuditDetails";
 import SupervisorDashboard from "./pages/SupervisorDashboard";
+import CoverageTracker from "./pages/CoverageTracker";
 import Reports from "./pages/Reports";
 import AdminPanel from "./pages/AdminPanel";
 
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import OfflineBanner from "./components/common/OfflineBanner";
+import ConnectivityToast from "./components/common/ConnectivityToast";
 
 export default function App() {
 
     return (
         <>
+            <ConnectivityToast />
             <OfflineBanner />
 
             <Routes>
 
                 <Route path="/" element={<Login />} />
                 <Route path="/signup" element={<Signup />} />
+                <Route path="/auth/confirmed" element={<EmailConfirmed />} />
 
                 <Route
                     path="/dashboard"
@@ -74,6 +79,15 @@ export default function App() {
                     element={
                         <ProtectedRoute>
                             <SupervisorDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/supervisor/coverage"
+                    element={
+                        <ProtectedRoute>
+                            <CoverageTracker />
                         </ProtectedRoute>
                     }
                 />

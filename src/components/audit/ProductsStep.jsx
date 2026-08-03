@@ -1,4 +1,4 @@
-import { useAudit } from "../../contexts/AuditContext";
+import { useAudit } from "../../hooks/useAudit";
 import { useCallback } from "react";
 
 import Card from "../common/Card";
@@ -33,6 +33,10 @@ import {
     RELOAD_SIZES,
     ENERGY_SIZES,
 } from "../../config/productCatalog";
+import {
+    CupSoda, Droplet, Milk, Coffee, Zap,
+    Citrus, Package, BatteryCharging, Clapperboard, Footprints, Candy,
+} from "lucide-react";
 
 export default function ProductsStep() {
     const { audit, setAudit } = useAudit();
@@ -131,7 +135,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="🥤">Champ</CardTitle>
+                <CardTitle icon={CupSoda}>Champ</CardTitle>
 
                 <SimpleMatrix
                     label="Sizes × Flavours"
@@ -142,7 +146,7 @@ export default function ProductsStep() {
                 />
             </Card>
                         <Card>
-                <CardTitle icon="💧">
+                <CardTitle icon={Droplet}>
                     Quencher Life Water
                 </CardTitle>
 
@@ -166,7 +170,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="🍫">
+                <CardTitle icon={Milk}>
                     Raha Drinking Chocolate
                 </CardTitle>
 
@@ -229,7 +233,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="🫙">
+                <CardTitle icon={Coffee}>
                     Raha Cocoa Powder
                 </CardTitle>
 
@@ -292,7 +296,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="⚡">
+                <CardTitle icon={Zap}>
                     Excel Glucose
                 </CardTitle>
 
@@ -383,7 +387,7 @@ export default function ProductsStep() {
                 </div>
             </Card>
                         <Card>
-                <CardTitle icon="🍹">GoFrut</CardTitle>
+                <CardTitle icon={Citrus}>GoFrut</CardTitle>
 
                 <SimpleMatrix
                     label="Sizes × Flavours"
@@ -395,7 +399,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="🍓">Fruit Full</CardTitle>
+                <CardTitle icon={Package}>Tetra Pack</CardTitle>
 
                 <div
                     style={{
@@ -417,7 +421,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="🔋">Energy Drink</CardTitle>
+                <CardTitle icon={BatteryCharging}>Energy Drink</CardTitle>
 
                 <div
                     style={{
@@ -438,7 +442,7 @@ export default function ProductsStep() {
                 </div>
             </Card>
                         <Card>
-                <CardTitle icon="🎬">Warner Bros</CardTitle>
+                <CardTitle icon={Clapperboard}>Warner Bros</CardTitle>
 
                 <SimpleMatrix
                     label="Sizes × Flavours"
@@ -450,7 +454,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="🏃">Reload Isotonic</CardTitle>
+                <CardTitle icon={Footprints}>Reload Isotonic</CardTitle>
 
                 <div
                     style={{
@@ -472,7 +476,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon="🍬">Jelly Pop</CardTitle>
+                <CardTitle icon={Candy}>Jelly Pop</CardTitle>
 
                 <SimpleMatrix
                     label="Sizes × Flavours"
