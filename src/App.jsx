@@ -15,12 +15,14 @@ import AdminPanel from "./pages/AdminPanel";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import OfflineBanner from "./components/common/OfflineBanner";
 import ConnectivityToast from "./components/common/ConnectivityToast";
+import UpdateBanner from "./components/common/UpdateBanner";
 
 export default function App() {
 
     return (
         <>
             <ConnectivityToast />
+            <UpdateBanner />
             <OfflineBanner />
 
             <Routes>
