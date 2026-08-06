@@ -4,6 +4,23 @@ const EDGE_EXCLUSION = 24;   // px from either screen edge to ignore entirely
 const SWIPE_THRESHOLD = 60;  // px of horizontal travel required to count as a swipe
 const DIRECTION_RATIO = 1.5; // horizontal movement must clearly dominate vertical
 
+/** Walks up from a touch target looking for an element that actually
+ * scrolls horizontally (the product size/flavour matrix, for instance) —
+ * if the touch started inside one, this hook has no business treating it
+ * as a step-navigation swipe. Stops at <body> rather than walking the
+ * whole document for every touch. */
+function startedInsideHorizontalScroller(target) {
+    let el = target;
+    while (el && el !== document.body) {
+        if (el.scrollWidth > el.clientWidth + 1) {
+            const overflowX = window.getComputedStyle(el).overflowX;
+            if (overflowX === "auto" || overflowX === "scroll") return true;
+        }
+        el = el.parentElement;
+    }
+    return false;
+}
+
 /**
  * Detects a deliberate horizontal swipe, while staying out of the way of:
  *  - the native edge-swipe "go back" gesture (swipes starting within
@@ -25,6 +42,11 @@ export function useSwipeNavigation({ onSwipeLeft, onSwipeRight, disabled = false
         const startX = touch.clientX;
 
         if (startX < EDGE_EXCLUSION || startX > window.innerWidth - EDGE_EXCLUSION) {
+            touchState.current = null;
+            return;
+        }
+
+        if (startedInsideHorizontalScroller(e.target)) {
             touchState.current = null;
             return;
         }

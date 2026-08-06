@@ -9,6 +9,7 @@ import { competitorSummaryText } from "../utils/competitors";
 import { distributorSummaryText } from "../utils/distributors";
 import { useAuth } from "../hooks/useAuth";
 import { canViewAllAudits } from "../utils/roles";
+import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 
 import Header from "../components/layout/Header";
 import PageContainer from "../components/layout/PageContainer";
@@ -73,11 +74,29 @@ export default function AuditDetails() {
     const nextId = currentIndex >= 0 && currentIndex < auditIds.length - 1 ? auditIds[currentIndex + 1] : null;
 
     function goToAudit(targetId) {
-        navigate(`/audit/${targetId}`, { state: { auditIds } });
+        // replace, not push — otherwise clicking Next a few times stacks
+        // up history entries, and the back button has to step back through
+        // every audit visited instead of returning straight to the list.
+        navigate(`/audit/${targetId}`, { state: { auditIds }, replace: true });
     }
+
+    // Swiping is a more discoverable way to page through the same list
+    // than small Previous/Next buttons — matches the swipe-between-steps
+    // pattern already used in the audit wizard, so it's a familiar
+    // gesture rather than a new one to learn. Called unconditionally
+    // (before any early return) since it's a hook — disabled instead of
+    // skipped when there's nothing to page through.
+    const swipeHandlers = useSwipeNavigation({
+        onSwipeLeft: () => nextId && goToAudit(nextId),
+        onSwipeRight: () => prevId && goToAudit(prevId),
+        disabled: !auditIds || auditIds.length <= 1,
+    });
 
     useEffect(() => {
         async function loadAudit() {
+            setLoading(true);
+            setAudit(null);
+
             const { data, error } = await supabase
                 .from("audit_submissions")
                 .select("*")
@@ -158,7 +177,7 @@ export default function AuditDetails() {
                 backTo="-1"
             />
 
-            <PageContainer withNav={false}>
+            <PageContainer withNav={false} {...swipeHandlers} style={{ touchAction: "pan-y" }}>
                 {auditIds && auditIds.length > 1 && currentIndex >= 0 && (
                     <div
                         style={{

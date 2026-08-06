@@ -45,7 +45,7 @@ const GENERAL_POOL = [
     "Which distributors are underperforming?",
     "Which area improved the most?",
     "Which competitors are gaining ground?",
-    "Where is Tetra Pack penetration weakest?",
+    "Where is Fruitfull penetration weakest?",
     "Which areas have the strongest coverage?",
     "Which outlets have never received a promotion?",
     "What's our biggest coverage gap right now?",

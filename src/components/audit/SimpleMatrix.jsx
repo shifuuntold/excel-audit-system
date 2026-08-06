@@ -61,7 +61,10 @@ export default memo(function SimpleMatrix({
         )}
       </div>
 
-      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div
+        onTouchStart={(e) => e.stopPropagation()}
+        style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", touchAction: "pan-x" }}
+      >
         <table
           style={{
             borderCollapse: "collapse",

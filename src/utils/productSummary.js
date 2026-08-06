@@ -33,7 +33,7 @@ const FLAT_GROUPS = {
 
 // Labeled-flat: keys are a flavour code -> true, needs a lookup for the label
 const LABELED_FLAT_GROUPS = {
-    ff: { label: "Tetra Pack", icon: Package, flavours: FF_FLAVOURS },
+    ff: { label: "Fruitfull", icon: Package, flavours: FF_FLAVOURS },
 };
 
 /**

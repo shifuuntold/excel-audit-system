@@ -36,7 +36,7 @@ export default function CoverageTracker() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [assigningOutlet, setAssigningOutlet] = useState(null); // the outlet row currently showing the assign form
+    const [assignAreaName, setAssignAreaName] = useState("");
     const [assignAuditorId, setAssignAuditorId] = useState("");
     const [assignDueDate, setAssignDueDate] = useState("");
     const [assignPriority, setAssignPriority] = useState("Medium");
@@ -73,26 +73,21 @@ export default function CoverageTracker() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canView]);
 
-    function openAssignForm(outlet) {
-        setAssigningOutlet(outlet);
-        setAssignAuditorId("");
-        setAssignDueDate("");
-        setAssignPriority("Medium");
-    }
-
     async function submitAssignment() {
-        if (!assignAuditorId || !assigningOutlet) return;
+        if (!assignAuditorId || !assignAreaName) return;
         setSavingAssignment(true);
         try {
             await createAssignment({
-                outletName: assigningOutlet.outlet_name,
-                area: assigningOutlet.area,
+                area: assignAreaName,
                 assignedTo: assignAuditorId,
                 assignedBy: user.id,
                 dueDate: assignDueDate,
                 priority: assignPriority,
             });
-            setAssigningOutlet(null);
+            setAssignAreaName("");
+            setAssignAuditorId("");
+            setAssignDueDate("");
+            setAssignPriority("Medium");
             const fresh = await getAllAssignments();
             setAssignments(fresh);
         } catch (err) {
@@ -261,6 +256,38 @@ export default function CoverageTracker() {
                             <StatCard icon={Users} label="Auditors Active Today" value={activeAuditorsToday} color={B.blue} />
                         </div>
 
+                        <SectionHeading icon={UserPlus}>Assign Area</SectionHeading>
+                        <div style={{ background: B.white, border: `1px solid ${B.blueLight}`, borderRadius: 12, padding: 14, marginBottom: 26, display: "flex", flexDirection: "column", gap: 8 }}>
+                            <Select label="Area" placeholder="Select area" value={assignAreaName} onChange={(e) => setAssignAreaName(e.target.value)}>
+                                {areas.map((a) => <option key={a.id} value={a.name}>{a.name}</option>)}
+                            </Select>
+                            <Select label="Assign to" placeholder="Select auditor" value={assignAuditorId} onChange={(e) => setAssignAuditorId(e.target.value)}>
+                                {auditors.map((a) => <option key={a.auditor_id} value={a.auditor_id}>{a.auditor_name}</option>)}
+                            </Select>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                <div>
+                                    <label style={{ fontSize: 11, fontWeight: 600, color: B.muted, display: "block", marginBottom: 4 }}>Due date</label>
+                                    <input type="date" className="eb-input" value={assignDueDate} onChange={(e) => setAssignDueDate(e.target.value)} style={{ fontSize: 13 }} />
+                                </div>
+                                <Select label="Priority" value={assignPriority} onChange={(e) => setAssignPriority(e.target.value)}>
+                                    <option value="High">High</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="Low">Low</option>
+                                </Select>
+                            </div>
+                            <button
+                                onClick={submitAssignment}
+                                disabled={!assignAuditorId || !assignAreaName || savingAssignment}
+                                style={{ background: B.blue, color: "#fff", border: 0, borderRadius: 8, padding: "10px 0", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: !assignAuditorId || !assignAreaName || savingAssignment ? 0.6 : 1 }}
+                            >
+                                {savingAssignment ? "Assigning..." : "Assign Area"}
+                            </button>
+                            <p style={{ margin: 0, fontSize: 11, color: B.muted, lineHeight: 1.5 }}>
+                                The auditor sees this on their Dashboard the moment they open the app, with a Mark Complete
+                                action and a suggested route through outlets in that area needing attention.
+                            </p>
+                        </div>
+
                         <SectionHeading icon={AlertTriangle}>Outlets Requiring Attention</SectionHeading>
                         {staleOutlets.length === 0 ? (
                             <EmptyState text="No outlets are overdue — every audited outlet has been visited within the last 14 days." />
@@ -268,7 +295,6 @@ export default function CoverageTracker() {
                             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 26 }}>
                                 {staleOutlets.slice(0, 30).map((o) => {
                                     const priority = priorityFor(o.days_since_last_visit ?? 0);
-                                    const isAssigning = assigningOutlet?.outlet_key === o.outlet_key;
                                     return (
                                         <div
                                             key={o.outlet_key}
@@ -277,57 +303,25 @@ export default function CoverageTracker() {
                                                 border: `1px solid ${B.blueLight}`,
                                                 borderRadius: 12,
                                                 padding: 14,
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "flex-start",
+                                                gap: 10,
                                             }}
                                         >
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                                                <div style={{ minWidth: 0 }}>
-                                                    <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: B.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                        {o.outlet_name || "Unnamed Outlet"}
-                                                    </p>
-                                                    <p style={{ margin: "3px 0 0", fontSize: 11.5, color: B.muted, display: "flex", alignItems: "center", gap: 4 }}>
-                                                        <MapPin size={11} /> {o.area || "Unknown area"}
-                                                        <span style={{ margin: "0 2px" }}>·</span>
-                                                        <Clock size={11} /> {o.days_since_last_visit} days ago
-                                                    </p>
-                                                </div>
-                                                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                                                    <span style={{ fontSize: 10.5, fontWeight: 700, color: priority.color, background: priority.bg, padding: "3px 10px", borderRadius: 20 }}>
-                                                        {priority.label}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => (isAssigning ? setAssigningOutlet(null) : openAssignForm(o))}
-                                                        style={{ display: "flex", alignItems: "center", gap: 4, background: B.blueFaint, color: B.blue, border: 0, borderRadius: 8, padding: "5px 9px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                                                    >
-                                                        <UserPlus size={12} /> Assign
-                                                    </button>
-                                                </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <p style={{ margin: 0, fontSize: 13.5, fontWeight: 700, color: B.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                    {o.outlet_name || "Unnamed Outlet"}
+                                                </p>
+                                                <p style={{ margin: "3px 0 0", fontSize: 11.5, color: B.muted, display: "flex", alignItems: "center", gap: 4 }}>
+                                                    <MapPin size={11} /> {o.area || "Unknown area"}
+                                                    <span style={{ margin: "0 2px" }}>·</span>
+                                                    <Clock size={11} /> {o.days_since_last_visit} days ago
+                                                </p>
                                             </div>
-
-                                            {isAssigning && (
-                                                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${B.blueLight}`, display: "flex", flexDirection: "column", gap: 8 }}>
-                                                    <Select label="Assign to" placeholder="Select auditor" value={assignAuditorId} onChange={(e) => setAssignAuditorId(e.target.value)}>
-                                                        {auditors.map((a) => <option key={a.auditor_id} value={a.auditor_id}>{a.auditor_name}</option>)}
-                                                    </Select>
-                                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                                        <div>
-                                                            <label style={{ fontSize: 11, fontWeight: 600, color: B.muted, display: "block", marginBottom: 4 }}>Due date</label>
-                                                            <input type="date" className="eb-input" value={assignDueDate} onChange={(e) => setAssignDueDate(e.target.value)} style={{ fontSize: 13 }} />
-                                                        </div>
-                                                        <Select label="Priority" value={assignPriority} onChange={(e) => setAssignPriority(e.target.value)}>
-                                                            <option value="High">High</option>
-                                                            <option value="Medium">Medium</option>
-                                                            <option value="Low">Low</option>
-                                                        </Select>
-                                                    </div>
-                                                    <button
-                                                        onClick={submitAssignment}
-                                                        disabled={!assignAuditorId || savingAssignment}
-                                                        style={{ background: B.blue, color: "#fff", border: 0, borderRadius: 8, padding: "8px 0", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: !assignAuditorId || savingAssignment ? 0.6 : 1 }}
-                                                    >
-                                                        {savingAssignment ? "Assigning..." : "Confirm Assignment"}
-                                                    </button>
-                                                </div>
-                                            )}
+                                            <span style={{ flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: priority.color, background: priority.bg, padding: "3px 10px", borderRadius: 20 }}>
+                                                {priority.label}
+                                            </span>
                                         </div>
                                     );
                                 })}
@@ -443,7 +437,7 @@ export default function CoverageTracker() {
 
                         <SectionHeading icon={ClipboardList}>Daily Assignment Board</SectionHeading>
                         {assignmentBoard.length === 0 ? (
-                            <EmptyState text="No outlets have been assigned yet — use 'Assign' above to start building today's board." />
+                            <EmptyState text="No areas have been assigned yet — use 'Assign Area' above to start building today's board." />
                         ) : (
                             <div style={{ overflowX: "auto", marginBottom: 20 }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
@@ -480,7 +474,7 @@ export default function CoverageTracker() {
                                         <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: B.white, border: `1px solid ${B.blueLight}`, borderRadius: 10, padding: "10px 12px" }}>
                                             <div style={{ minWidth: 0 }}>
                                                 <p style={{ margin: 0, fontSize: 12.5, fontWeight: 600, color: B.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                    {a.outlet_name} {auditor ? `· ${auditor.auditor_name}` : ""}
+                                                    {a.area} {auditor ? `· ${auditor.auditor_name}` : ""}
                                                 </p>
                                                 <p style={{ margin: "2px 0 0", fontSize: 11, color: B.muted }}>
                                                     {a.due_date ? `Due ${a.due_date}` : "No due date"}

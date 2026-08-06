@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { getQueueCount, syncQueue } from "../services/offlineQueue";
+import { getQueueCount, getStuckCount, syncQueue, getQueuedAudits, removeFromQueue } from "../services/offlineQueue";
 import { saveAudit } from "../services/auditService";
 import { useOnlineStatus } from "./useOnlineStatus";
 
 export function useOfflineQueue() {
     const isOnline = useOnlineStatus();
     const [queueCount, setQueueCount] = useState(getQueueCount());
+    const [stuckCount, setStuckCount] = useState(getStuckCount());
     const [syncing, setSyncing] = useState(false);
 
     useEffect(() => {
-        function refresh() { setQueueCount(getQueueCount()); }
+        function refresh() {
+            setQueueCount(getQueueCount());
+            setStuckCount(getStuckCount());
+        }
         window.addEventListener("offline-queue-changed", refresh);
         return () => window.removeEventListener("offline-queue-changed", refresh);
     }, []);
@@ -20,10 +24,19 @@ export function useOfflineQueue() {
         try {
             const result = await syncQueue(saveAudit);
             setQueueCount(getQueueCount());
+            setStuckCount(getStuckCount());
             return result;
         } finally {
             setSyncing(false);
         }
+    }, []);
+
+    const discardStuck = useCallback(() => {
+        for (const item of getQueuedAudits().filter((i) => (i.failCount || 0) >= 3)) {
+            removeFromQueue(item.localId);
+        }
+        setQueueCount(getQueueCount());
+        setStuckCount(getStuckCount());
     }, []);
 
     // auto-sync whenever connectivity returns
@@ -35,5 +48,5 @@ export function useOfflineQueue() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOnline]);
 
-    return { isOnline, queueCount, syncing, sync };
+    return { isOnline, queueCount, stuckCount, syncing, sync, discardStuck };
 }

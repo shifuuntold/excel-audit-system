@@ -44,7 +44,13 @@ export function clearQueue() {
 
 /**
  * Attempts to push every queued audit to Supabase via saveAudit.
- * Removes items on success, leaves failures queued for the next try.
+ * Removes items on success. A failure is left queued for the next try,
+ * with its failCount incremented — after a few failures in a row (a
+ * validation error, not a connectivity blip, since a real offline retry
+ * never even reaches saveAuditFn to fail this way) it's very unlikely to
+ * ever succeed on its own, so the UI needs to be able to show it as
+ * stuck and offer to discard it rather than silently retrying forever
+ * with no way for anyone to know why the banner won't go away.
  */
 export async function syncQueue(saveAuditFn) {
     const queue = readQueue();
@@ -61,11 +67,25 @@ export async function syncQueue(saveAuditFn) {
             synced++;
         } catch (error) {
             console.error("Sync failed for", item.localId, error);
+            const current = readQueue();
+            writeQueue(
+                current.map((q) =>
+                    q.localId === item.localId ? { ...q, failCount: (q.failCount || 0) + 1 } : q
+                )
+            );
             failed++;
         }
     }
 
     return { synced, failed };
+}
+
+/** Items that have failed enough times in a row that they're treating as
+ * stuck rather than "waiting for connectivity" — surfaced separately so
+ * the banner has something concrete to say instead of just retrying
+ * forever silently. */
+export function getStuckCount(threshold = 3) {
+    return readQueue().filter((item) => (item.failCount || 0) >= threshold).length;
 }
 
 // An audit captured offline may only have a typed area_name and no real

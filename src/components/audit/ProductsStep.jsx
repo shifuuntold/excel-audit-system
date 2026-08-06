@@ -399,7 +399,7 @@ export default function ProductsStep() {
             </Card>
 
             <Card>
-                <CardTitle icon={Package}>Tetra Pack</CardTitle>
+                <CardTitle icon={Package}>Fruitfull</CardTitle>
 
                 <div
                     style={{

@@ -7,12 +7,12 @@ async function refreshOverdueStatuses() {
     if (error) console.error("Failed to refresh overdue assignments:", error);
 }
 
-export async function createAssignment({ outletName, area, assignedTo, assignedBy, dueDate, priority, notes }) {
+export async function createAssignment({ area, outletName, assignedTo, assignedBy, dueDate, priority, notes }) {
     const { data, error } = await supabase
         .from("outlet_assignments")
         .insert({
-            outlet_name: outletName,
-            area: area || null,
+            area,
+            outlet_name: outletName || null,
             assigned_to: assignedTo,
             assigned_by: assignedBy,
             due_date: dueDate || null,

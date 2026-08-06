@@ -67,9 +67,22 @@ export default memo(function ProductMatrix({
             </div>
 
             <div
+                // Stops touchstart here from bubbling up to the wizard's
+                // swipe-to-change-step handler on the outer step container —
+                // without this, swiping across sizes (e.g. DTT has more
+                // columns than fit on screen) got misread as "swipe to next
+                // step" instead of just scrolling this table sideways.
+                onTouchStart={(e) => e.stopPropagation()}
                 style={{
                     overflowX: "auto",
                     WebkitOverflowScrolling: "touch",
+                    // stopPropagation above only stops React's synthetic
+                    // event bubbling — it does nothing about the ancestor
+                    // step container's touchAction: "pan-y", which the
+                    // browser enforces natively regardless of JS event
+                    // handling. Without this, the browser itself still
+                    // refuses to let this element pan horizontally.
+                    touchAction: "pan-x",
                 }}
             >
                 <table
