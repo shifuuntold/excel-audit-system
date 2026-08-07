@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildReportData, generateNarrativeSections } from "../reportService";
+import { buildReportData, generateNarrativeSections, generateAiReportSections, formatReportDate } from "../reportService";
 
 function makeAudit(overrides = {}) {
     return {
@@ -126,5 +126,66 @@ describe("generateNarrativeSections", () => {
         const promo = sections.find((s) => s.heading === "Promotional Activity");
         expect(promo).toBeDefined();
         expect(promo.text).toMatch(/No promotional activity was observed in 1 outlet/);
+    });
+});
+
+describe("formatReportDate", () => {
+    it("formats a single day as one DD/MM/YYYY date", () => {
+        expect(formatReportDate("2026-08-05", "2026-08-05")).toBe("05/08/2026");
+    });
+
+    it("formats a range as two dates joined by an en dash", () => {
+        expect(formatReportDate("2026-08-01", "2026-08-05")).toBe("01/08/2026 – 05/08/2026");
+    });
+});
+
+describe("generateAiReportSections", () => {
+    it("matches the exact requested section order and headings", () => {
+        const audits = [
+            makeAudit({ products: { water: { "500ml": true } }, market: { promotion: "No" } }),
+        ];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Kiambu Town" }, {
+            keyObservations: ["Water showed the strongest penetration."],
+            recommendations: ["Increase visit frequency."],
+        });
+
+        const headings = sections.map((s) => s.heading);
+        // Order matters — this is the exact sequence requested.
+        expect(headings.indexOf("Executive Summary")).toBeLessThan(headings.indexOf("Key Observations"));
+        expect(headings.indexOf("Key Observations")).toBeLessThan(headings.indexOf("Product Availability & Penetration"));
+        expect(headings).toContain("Promotional Activity");
+    });
+
+    it("formats product penetration exactly as 'Label – Available in X of Y outlets (Tier)'", () => {
+        const audits = [
+            makeAudit({ products: { water: { "500ml": true } } }),
+            makeAudit({ products: {} }),
+            makeAudit({ products: {} }),
+            makeAudit({ products: {} }),
+            makeAudit({ products: {} }),
+        ];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Pipeline" }, {});
+        const productSection = sections.find((s) => s.heading === "Product Availability & Penetration");
+        const waterLine = productSection.items.find((i) => i.startsWith("Quencher Life Water"));
+        expect(waterLine).toBe("Quencher Life Water – Available in 1 of 5 outlets (Poor penetration)");
+    });
+
+    it("omits Key Observations and Recommendations sections when the AI content is empty", () => {
+        const audits = [makeAudit()];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Pipeline" }, {});
+        expect(sections.find((s) => s.heading === "Key Observations")).toBeUndefined();
+        expect(sections.find((s) => s.heading === "Recommendations")).toBeUndefined();
+    });
+
+    it("lists distributor names as plain bullets with an intro line, not a count table", () => {
+        const audits = [makeAudit({ market: { distributors: ["Wasoko", "Jumra"] } })];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Pipeline" }, {});
+        const distSection = sections.find((s) => s.heading === "Distributor Activity");
+        expect(distSection.text).toBe("The following distributors were mentioned by retailers:");
+        expect(distSection.items).toEqual(expect.arrayContaining(["Wasoko", "Jumra"]));
     });
 });

@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGemini, extractJson } from "./gemini.ts";
 import { QUERY_TYPES, CLASSIFICATION_GUIDE, fetchData, type QueryType } from "./dataFetch.ts";
 import { runRulesEngine, computeConfidence, type Flag } from "./rules.ts";
-import { buildReportPrompt, type ReportSection } from "./report.ts";
+import { buildReportFindingsPrompt, type ReportFindingsInput } from "./report.ts";
 import { EXECUTIVE_STYLE_RULES } from "./promptRules.ts";
 
 const corsHeaders = {
@@ -33,12 +33,13 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    const { question, startDate, endDate, mode, history } = body as {
+    const { question, startDate, endDate, mode, history, reportData } = body as {
       question?: string;
       startDate?: string;
       endDate?: string;
       mode?: "query" | "weekly_brief" | "full_report";
       history?: HistoryTurn[];
+      reportData?: ReportFindingsInput;
     };
 
     if (mode === "weekly_brief") {
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
     }
 
     if (mode === "full_report") {
-      return await handleFullReport(startDate, endDate);
+      return await handleFullReport(reportData);
     }
 
     if (!question || !question.trim()) {
@@ -178,40 +179,39 @@ function formatHistory(history?: HistoryTurn[]): string {
 }
 
 /**
- * The full "AI Audit Analyst" management report — Executive Summary through
- * Recommended Actions, matching the analytical framework given for this
- * feature. Deliberately over-fetches like risk_summary, since a genuine
- * analyst report needs the fuller picture (auditor + outlet intelligence,
- * period-over-period trend) to say anything with real substance.
+ * Generates the two judgment-requiring sections of the "FIELD SALES
+ * AUDITOR REPORT" — Key Observations and Recommendations. Every other
+ * section (product penetration, competitor landscape, distributor
+ * activity, promotional activity, retailer feedback) is deterministic
+ * and assembled entirely on the client from the same numbers the
+ * rule-based Quick Report already uses — see
+ * reportService.js's generateAiReportSections.
  *
- * Returns `sections` in the exact shape Reports.jsx and docxExport.js
- * already consume (heading/type/text/items) — this is a drop-in alternative
- * data source for the same rendering and Word-export code that already
- * exists for the rule-based report, not a new UI.
+ * Deliberately takes no startDate/endDate and does no database access of
+ * its own: the client already fetched and scoped the underlying audits
+ * (via the exact same getAudits() call the Quick Report is built from,
+ * which is what actually enforces "an Auditor only ever sees their own
+ * audits" — reusing that existing, proven scoping instead of re-deriving
+ * caller identity/role here and trusting a client-supplied user id).
  */
-async function handleFullReport(startDate?: string, endDate?: string) {
-  const bundle = await fetchData({
-    supabase,
-    queryType: "risk_summary",
-    startDate: startDate || null,
-    endDate: endDate || null,
-  });
+async function handleFullReport(reportData?: ReportFindingsInput) {
+  if (!reportData) {
+    return Response.json(
+      { success: false, error: "reportData is required for full_report mode" },
+      { status: 400, headers: corsHeaders }
+    );
+  }
 
-  const flags = runRulesEngine(bundle);
-  const confidence = computeConfidence(bundle.overall);
-
-  const prompt = buildReportPrompt({ startDate: startDate || null, endDate: endDate || null, bundle, flags, confidence });
-  const reportText = await callGemini(GEMINI_API_KEY!, prompt);
-  const report = extractJson<{ sections: ReportSection[] }>(reportText);
+  const prompt = buildReportFindingsPrompt(reportData);
+  const text = await callGemini(GEMINI_API_KEY!, prompt);
+  const findings = extractJson<{ key_observations: string[]; recommendations: string[] }>(text);
 
   return Response.json(
     {
       success: true,
       mode: "full_report",
-      period: { startDate: startDate || null, endDate: endDate || null },
-      confidence,
-      flags,
-      sections: report.sections || [],
+      key_observations: findings.key_observations || [],
+      recommendations: findings.recommendations || [],
     },
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );

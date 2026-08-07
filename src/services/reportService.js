@@ -249,6 +249,134 @@ export function buildReportData(audits, areaMap) {
     };
 }
 
+function formatReportDate(startDate, endDate) {
+    const fmt = (d) => {
+        const date = new Date(d + "T00:00:00");
+        return `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+    };
+    if (!startDate || !endDate) return "-";
+    if (startDate === endDate) return fmt(startDate);
+    return `${fmt(startDate)} – ${fmt(endDate)}`;
+}
+
+/**
+ * The "FIELD SALES AUDITOR REPORT" format — Area/Date/Total Outlets
+ * header, then Executive Summary through Recommendations in a fixed
+ * order matching a specific requested layout. Every section here is
+ * deterministic (reuses the exact same buildReportData() numbers the
+ * Quick Report is built from — same product penetration tiers, same
+ * competitor-by-category grouping, same feedback theme detection) EXCEPT
+ * keyObservations and recommendations, which are passed in already
+ * generated (by Gemini, in the edge function) since those two genuinely
+ * benefit from judgment/prioritization rather than a fixed rule — this
+ * function only assembles them into the right place, it doesn't invent
+ * them if they're missing.
+ */
+export function generateAiReportSections(data, meta, aiContent = {}) {
+    const { areaLabel } = meta;
+    const { keyObservations = [], recommendations = [] } = aiContent;
+    const {
+        totalOutlets, productPenetration, competitorTallyByCategory,
+        distributorTally, promotionYes, feedback,
+    } = data;
+
+    const sections = [];
+
+    let summary = `A field audit was conducted across ${totalOutlets} retail outlet${totalOutlets === 1 ? "" : "s"} in ${areaLabel} to assess product availability, market penetration, competitive activity, distributor presence and retailer feedback.`;
+
+    const excellentOrGood = productPenetration.filter((p) => p.pct >= 50).map((p) => p.label);
+    const moderate = productPenetration.filter((p) => p.pct >= 25 && p.pct < 50).map((p) => p.label);
+    const zeroProducts = productPenetration.filter((p) => p.pct === 0).map((p) => p.label);
+    const lowProducts = productPenetration.filter((p) => p.pct > 0 && p.pct < 25).map((p) => p.label);
+
+    if (excellentOrGood.length > 0) {
+        summary += ` The audit revealed excellent penetration for ${excellentOrGood.join(" and ")}.`;
+    }
+    if (moderate.length > 0) {
+        summary += ` ${moderate.join(" and ")} recorded moderate penetration, while most of the remaining portfolio maintained low market presence.`;
+    }
+    if (zeroProducts.length > 0) {
+        summary += ` ${zeroProducts.join(" and ")} ${zeroProducts.length === 1 ? "was" : "were"} not found in any outlet visited`;
+        summary += lowProducts.length > 0 ? `, while ${lowProducts.join(" and ")} recorded minimal presence.` : ".";
+    } else if (lowProducts.length > 0) {
+        summary += ` ${lowProducts.join(" and ")} recorded minimal presence.`;
+    }
+    sections.push({ heading: "Executive Summary", type: "paragraph", text: summary });
+
+    if (keyObservations.length > 0) {
+        sections.push({ heading: "Key Observations", type: "bullets", items: keyObservations });
+    }
+
+    sections.push({
+        heading: "Product Availability & Penetration",
+        type: "bullets",
+        items: productPenetration.map((p) => `${p.label} – Available in ${p.count} of ${totalOutlets} outlets (${p.tier})`),
+    });
+
+    const categoryEntries = competitorTallyByCategory.filter(([catKey]) => catKey !== "other");
+    const otherEntry = competitorTallyByCategory.find(([catKey]) => catKey === "other");
+    if (categoryEntries.length > 0 || otherEntry) {
+        const rankedCategories = [...categoryEntries].sort((a, b) => {
+            const totalA = a[1].reduce((s, [, c]) => s + c, 0);
+            const totalB = b[1].reduce((s, [, c]) => s + c, 0);
+            return totalB - totalA;
+        });
+        const topLabels = rankedCategories.slice(0, 3).map(([catKey]) => COMPETITOR_CATEGORY_LABELS[catKey] || catKey);
+
+        const introParagraphs = [];
+        if (topLabels.length === 1) introParagraphs.push(`Competition remains strongest in the ${topLabels[0]} category.`);
+        else if (topLabels.length === 2) introParagraphs.push(`Competition remains strongest in the ${topLabels[0]} and ${topLabels[1]} categories.`);
+        else if (topLabels.length >= 3) introParagraphs.push(`Competition remains strongest in the ${topLabels[0]}, ${topLabels[1]} and ${topLabels[2]} categories.`);
+        if (categoryEntries.length > 0) introParagraphs.push("Key competitors observed include:");
+
+        const groups = categoryEntries
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([catKey, names]) => ({
+                label: COMPETITOR_CATEGORY_LABELS[catKey] || catKey,
+                items: names.map(([name]) => name),
+            }));
+
+        sections.push({
+            heading: "Competitive Landscape",
+            type: "grouped-bullets",
+            introParagraphs,
+            groups,
+            outro: otherEntry ? `Other notable competing brands observed include ${otherEntry[1].map(([name]) => name).join(", ")}.` : undefined,
+        });
+    }
+
+    if (distributorTally.length > 0) {
+        sections.push({
+            heading: "Distributor Activity",
+            type: "bullets",
+            text: "The following distributors were mentioned by retailers:",
+            items: distributorTally.map(([name]) => name),
+        });
+    }
+
+    sections.push({
+        heading: "Promotional Activity",
+        type: "paragraph",
+        text: promotionYes > 0
+            ? `Promotional activity was observed in ${promotionYes} of ${totalOutlets} outlets visited.`
+            : `No promotional activity was observed in any of the ${totalOutlets} outlets visited.`,
+    });
+
+    if (feedback.length > 0) {
+        const { themeLines, unmatched } = groupFeedbackThemes(feedback);
+        const items = [...themeLines, ...unmatched];
+        if (items.length > 0) sections.push({ heading: "Retailer Feedback", type: "bullets", items });
+    }
+
+    if (recommendations.length > 0) {
+        sections.push({ heading: "Recommendations", type: "bullets", items: recommendations });
+    }
+
+    return sections;
+}
+
+export { formatReportDate };
+
 function formatPeriodPhrase(startDate, endDate) {
     if (!startDate || !endDate) return "the recorded period";
     const fmt = (d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });

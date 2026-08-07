@@ -55,6 +55,9 @@ export async function exportReportToDocx(sections, meta, filename = "field-audit
         }
 
         if (section.type === "bullets" && section.items) {
+            if (section.text) {
+                children.push(new Paragraph({ children: [new TextRun(section.text)] }));
+            }
             for (const item of section.items) {
                 children.push(new Paragraph({ text: item, bullet: { level: 0 } }));
             }
