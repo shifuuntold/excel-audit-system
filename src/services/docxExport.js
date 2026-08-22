@@ -12,8 +12,8 @@ function reportTable(headers, rows) {
 }
 
 /**
- * Renders a narrative report (from reportService.generateNarrativeSections)
- * into a downloadable Word document, mirroring a manually-written audit report.
+ * Renders a report's sections (from reportService.generateAiReportSections)
+ * into a downloadable Word document, mirroring the on-screen report.
  */
 export async function exportReportToDocx(sections, meta, filename = "field-audit-report.docx", reportData) {
     const { areaLabel, startDate, endDate, generatedAt } = meta;

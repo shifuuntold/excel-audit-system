@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../hooks/useAuth";
 import { loadConversation, saveConversation, clearConversation } from "../../services/aiConversationService";
+import { speakText, stopSpeaking } from "../../utils/speech";
 import { B } from "../../config/theme";
 import {
     Send, Lightbulb, FileBarChart, AlertTriangle, ShieldAlert, ShieldCheck,
@@ -98,11 +99,17 @@ export default function AIDashboardQuery({ dateRange, pageContext }) {
     const [briefPending, setBriefPending] = useState(false);
     const [loaded, setLoaded] = useState(false);
     const [speakingId, setSpeakingId] = useState(null);
+    const speechController = useRef(null);
     // Sampled once per mount (i.e. each time the assistant sheet opens) —
     // see pickPrompts() for why this rotates instead of always showing the
     // same handful of questions.
     const [prompts] = useState(() => pickPrompts(pageContext));
     const anyPending = messages.some((m) => m.pending) || briefPending;
+
+    // Stops any speech in progress the moment this component unmounts
+    // (sheet closed, navigated away) — otherwise a report keeps talking
+    // in the background with no visible control left to stop it.
+    useEffect(() => () => stopSpeaking(), []);
 
     // Restore the persisted conversation on open — survives closing the
     // sheet, refreshing, and logging back in later, instead of resetting
@@ -178,22 +185,27 @@ export default function AIDashboardQuery({ dateRange, pageContext }) {
     }
 
     function toggleReadAloud(id, text) {
-        if (!("speechSynthesis" in window)) return;
         if (speakingId === id) {
-            window.speechSynthesis.cancel();
+            speechController.current?.stop();
+            speechController.current = null;
             setSpeakingId(null);
             return;
         }
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.onend = () => setSpeakingId(null);
-        utterance.onerror = () => setSpeakingId(null);
+        speechController.current?.stop();
         setSpeakingId(id);
-        window.speechSynthesis.speak(utterance);
+        speechController.current = speakText(text, {
+            onEnd: () => setSpeakingId(null),
+            onError: (err) => {
+                console.error("Read aloud failed:", err);
+                setSpeakingId(null);
+            },
+        });
     }
 
     async function handleNewConversation() {
-        window.speechSynthesis?.cancel();
+        stopSpeaking();
+        speechController.current = null;
+        setSpeakingId(null);
         setMessages([]);
         if (user) {
             try {

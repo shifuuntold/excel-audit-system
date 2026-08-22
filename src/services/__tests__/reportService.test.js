@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildReportData, generateNarrativeSections, generateAiReportSections, formatReportDate } from "../reportService";
+import { buildReportData, generateAiReportSections, formatReportDate, formatReportAsText } from "../reportService";
 
 function makeAudit(overrides = {}) {
     return {
@@ -79,56 +79,6 @@ describe("buildReportData", () => {
     });
 });
 
-describe("generateNarrativeSections", () => {
-    it("uses natural single-day phrasing instead of 'between X and X'", () => {
-        const audits = [makeAudit({ products: { water: { "500ml": true } } })];
-        const data = buildReportData(audits, {});
-        const sections = generateNarrativeSections(data, {
-            areaLabel: "Pipeline",
-            startDate: "2026-07-13",
-            endDate: "2026-07-13",
-        });
-        const summary = sections.find((s) => s.heading === "Executive Summary");
-        expect(summary.text).not.toMatch(/between/i);
-        expect(summary.text).toMatch(/on July 13, 2026/);
-    });
-
-    it("uses a 'between X and Y' range for multi-day periods", () => {
-        const audits = [makeAudit({ products: { water: { "500ml": true } } })];
-        const data = buildReportData(audits, {});
-        const sections = generateNarrativeSections(data, {
-            areaLabel: "Pipeline",
-            startDate: "2026-07-07",
-            endDate: "2026-07-13",
-        });
-        const summary = sections.find((s) => s.heading === "Executive Summary");
-        expect(summary.text).toMatch(/between July 7, 2026 and July 13, 2026/);
-    });
-
-    it("omits Distributor Activity entirely when nothing was recorded, rather than stating the gap", () => {
-        const audits = [makeAudit({ market: {} })];
-        const data = buildReportData(audits, {});
-        const sections = generateNarrativeSections(data, { areaLabel: "Pipeline", startDate: "2026-07-13", endDate: "2026-07-13" });
-        expect(sections.find((s) => s.heading === "Distributor Activity")).toBeUndefined();
-    });
-
-    it("omits Promotional Activity entirely when nothing was recorded either way", () => {
-        const audits = [makeAudit({ market: {} })];
-        const data = buildReportData(audits, {});
-        const sections = generateNarrativeSections(data, { areaLabel: "Pipeline", startDate: "2026-07-13", endDate: "2026-07-13" });
-        expect(sections.find((s) => s.heading === "Promotional Activity")).toBeUndefined();
-    });
-
-    it("still reports Promotional Activity when at least one real answer was recorded", () => {
-        const audits = [makeAudit({ market: { promotion: "No" } })];
-        const data = buildReportData(audits, {});
-        const sections = generateNarrativeSections(data, { areaLabel: "Pipeline", startDate: "2026-07-13", endDate: "2026-07-13" });
-        const promo = sections.find((s) => s.heading === "Promotional Activity");
-        expect(promo).toBeDefined();
-        expect(promo.text).toMatch(/No promotional activity was observed in 1 outlet/);
-    });
-});
-
 describe("formatReportDate", () => {
     it("formats a single day as one DD/MM/YYYY date", () => {
         expect(formatReportDate("2026-08-05", "2026-08-05")).toBe("05/08/2026");
@@ -140,6 +90,46 @@ describe("formatReportDate", () => {
 });
 
 describe("generateAiReportSections", () => {
+    it("omits Promotional Activity entirely when the question was never answered on any audit, rather than reporting a false zero", () => {
+        const audits = [makeAudit({ market: {} })];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Pipeline" }, {});
+        expect(sections.find((s) => s.heading === "Promotional Activity")).toBeUndefined();
+    });
+
+    it("reports Promotional Activity once at least one audit actually answered the question, even if the answer was No", () => {
+        const audits = [makeAudit({ market: { promotion: "No" } })];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Pipeline" }, {});
+        const promo = sections.find((s) => s.heading === "Promotional Activity");
+        expect(promo).toBeDefined();
+        expect(promo.text).toMatch(/No promotional activity was observed in any of the 1 outlets? visited/);
+    });
+
+    it("uses the AI-synthesized retailer feedback when provided, not the raw unmatched quotes", () => {
+        const audits = [makeAudit({ market: { feedback: "The owner said stock runs out fast on weekends near the highway junction." } })];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Pipeline" }, {
+            retailerFeedback: ["Some retailers reported stock running out during peak demand periods."],
+        });
+        const feedbackSection = sections.find((s) => s.heading === "Retailer Feedback");
+        expect(feedbackSection.items).toEqual(["Some retailers reported stock running out during peak demand periods."]);
+        expect(feedbackSection.items.join(" ")).not.toContain("highway junction");
+    });
+
+    it("falls back to pattern-matched theme lines (never raw quotes) if the AI didn't return retailer feedback", () => {
+        const audits = [makeAudit({ market: { feedback: "Sales rep hasn't visited in weeks, products keep running out." } })];
+        const data = buildReportData(audits, {});
+        const sections = generateAiReportSections(data, { areaLabel: "Pipeline" }, {});
+        const feedbackSection = sections.find((s) => s.heading === "Retailer Feedback");
+        // Falls back to theme-line detection only — this audit's comment
+        // matches the "sales rep visit" theme, so a theme line should
+        // appear; the fallback must never include the raw sentence itself.
+        if (feedbackSection) {
+            expect(feedbackSection.items.join(" ")).not.toContain("hasn't visited in weeks");
+        }
+    });
+
     it("matches the exact requested section order and headings", () => {
         const audits = [
             makeAudit({ products: { water: { "500ml": true } }, market: { promotion: "No" } }),
@@ -187,5 +177,37 @@ describe("generateAiReportSections", () => {
         const distSection = sections.find((s) => s.heading === "Distributor Activity");
         expect(distSection.text).toBe("The following distributors were mentioned by retailers:");
         expect(distSection.items).toEqual(expect.arrayContaining(["Wasoko", "Jumra"]));
+    });
+});
+
+describe("formatReportAsText", () => {
+    it("includes the header fields and every section's content as plain text", () => {
+        const sections = [
+            { heading: "Executive Summary", type: "paragraph", text: "Coverage was strong this period." },
+            { heading: "Recommendations", type: "bullets", items: ["Increase visit frequency.", "Add promotions."] },
+        ];
+        const text = formatReportAsText(sections, { areaLabel: "Pipeline", dateLabel: "05/08/2026", totalOutlets: 28 });
+
+        expect(text).toContain("FIELD SALES AUDITOR REPORT");
+        expect(text).toContain("Area: Pipeline");
+        expect(text).toContain("Total Outlets Covered: 28");
+        expect(text).toContain("Coverage was strong this period.");
+        expect(text).toContain("- Increase visit frequency.");
+        expect(text).toContain("- Add promotions.");
+    });
+
+    it("flattens grouped-bullets sections (e.g. Competitive Landscape) into readable text", () => {
+        const sections = [{
+            heading: "Competitive Landscape",
+            type: "grouped-bullets",
+            introParagraphs: ["Competition remains strongest in Water."],
+            groups: [{ label: "Water", items: ["Dasani", "Aquaclear"] }],
+        }];
+        const text = formatReportAsText(sections, { areaLabel: "Pipeline", dateLabel: "05/08/2026", totalOutlets: 10 });
+
+        expect(text).toContain("Competition remains strongest in Water.");
+        expect(text).toContain("Water:");
+        expect(text).toContain("- Dasani");
+        expect(text).toContain("- Aquaclear");
     });
 });

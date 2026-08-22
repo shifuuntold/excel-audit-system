@@ -274,10 +274,10 @@ function formatReportDate(startDate, endDate) {
  */
 export function generateAiReportSections(data, meta, aiContent = {}) {
     const { areaLabel } = meta;
-    const { keyObservations = [], recommendations = [] } = aiContent;
+    const { keyObservations = [], retailerFeedback = [], recommendations = [] } = aiContent;
     const {
         totalOutlets, productPenetration, competitorTallyByCategory,
-        distributorTally, promotionYes, feedback,
+        distributorTally, promotionYes, promotionNo, feedback,
     } = data;
 
     const sections = [];
@@ -354,18 +354,35 @@ export function generateAiReportSections(data, meta, aiContent = {}) {
         });
     }
 
-    sections.push({
-        heading: "Promotional Activity",
-        type: "paragraph",
-        text: promotionYes > 0
-            ? `Promotional activity was observed in ${promotionYes} of ${totalOutlets} outlets visited.`
-            : `No promotional activity was observed in any of the ${totalOutlets} outlets visited.`,
-    });
+    // Don't state "no promotional activity" as if that's a finding when
+    // the question was never actually answered on any audit — a
+    // genuinely recorded zero and a field nobody filled in are different
+    // facts, and reporting the second as the first would be exactly the
+    // "zero confused with null" mistake worth avoiding in this kind of
+    // report.
+    if (promotionYes > 0 || promotionNo > 0) {
+        sections.push({
+            heading: "Promotional Activity",
+            type: "paragraph",
+            text: promotionYes > 0
+                ? `Promotional activity was observed in ${promotionYes} of ${totalOutlets} outlets visited.`
+                : `No promotional activity was observed in any of the ${totalOutlets} outlets visited.`,
+        });
+    }
 
-    if (feedback.length > 0) {
-        const { themeLines, unmatched } = groupFeedbackThemes(feedback);
-        const items = [...themeLines, ...unmatched];
-        if (items.length > 0) sections.push({ heading: "Retailer Feedback", type: "bullets", items });
+    if (retailerFeedback.length > 0) {
+        // Preferred path — Gemini has already paraphrased the raw feedback
+        // text into readable, non-attributable themes (see report.ts's
+        // prompt). This is what actually fixes retailer feedback reading
+        // like a list of verbatim quotes instead of a human summary.
+        sections.push({ heading: "Retailer Feedback", type: "bullets", items: retailerFeedback });
+    } else if (feedback.length > 0) {
+        // Fallback if the AI didn't return anything for this section —
+        // pattern-matched theme lines only, deliberately never the raw
+        // "unmatched" quotes, since dumping someone's exact words back
+        // into a report is the behavior being fixed here.
+        const { themeLines } = groupFeedbackThemes(feedback);
+        if (themeLines.length > 0) sections.push({ heading: "Retailer Feedback", type: "bullets", items: themeLines });
     }
 
     if (recommendations.length > 0) {
@@ -375,188 +392,45 @@ export function generateAiReportSections(data, meta, aiContent = {}) {
     return sections;
 }
 
-export { formatReportDate };
-
-function formatPeriodPhrase(startDate, endDate) {
-    if (!startDate || !endDate) return "the recorded period";
-    const fmt = (d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
-    if (startDate === endDate) return `on ${fmt(startDate)}`;
-    return `between ${fmt(startDate)} and ${fmt(endDate)}`;
-}
-
 /**
- * Turns the crunched numbers into narrative sections — the same structure
- * is rendered on-screen and fed into the Word export, so they always match.
- * Returns: [{ heading, type: 'paragraph'|'bullets', text?, items? }]
+ * Flattens a report (header meta + sections) into plain text — used for
+ * both the Copy button and Read Aloud, so what gets copied and what gets
+ * spoken are always the same content, just consumed differently.
  */
-export function generateNarrativeSections(data, meta) {
-    const { areaLabel, startDate, endDate } = meta;
-    const periodPhrase = formatPeriodPhrase(startDate, endDate);
-    const {
-        totalOutlets, outletsWithNoProducts, noProductPct, productPenetration,
-        competitorTallyByCategory, distributorTally, promotionYes, promotionNo,
-        visitedNo, feedback,
-    } = data;
+export function formatReportAsText(sections, meta) {
+    const { areaLabel, dateLabel, totalOutlets } = meta;
+    const lines = [
+        "FIELD SALES AUDITOR REPORT",
+        `Area: ${areaLabel}`,
+        `Date: ${dateLabel}`,
+        `Total Outlets Covered: ${totalOutlets}`,
+        "",
+    ];
 
-    const sections = [];
+    for (const section of sections) {
+        lines.push(section.heading.toUpperCase(), "");
 
-    if (totalOutlets === 0) {
-        sections.push({
-            heading: "Executive Summary",
-            type: "paragraph",
-            text: `No audits were recorded for ${areaLabel} ${periodPhrase}.`,
-        });
-        return sections;
-    }
-
-    const excellentOrGood = productPenetration.filter((p) => p.pct >= 50).map((p) => p.label);
-    const zeroProducts = productPenetration.filter((p) => p.pct === 0).map((p) => p.label);
-    const lowProducts = productPenetration.filter((p) => p.pct > 0 && p.pct < 25).map((p) => p.label);
-
-    // Executive Summary
-    let summary = `A field audit was conducted across ${totalOutlets} retail outlet${totalOutlets === 1 ? "" : "s"} in ${areaLabel} ${periodPhrase} to assess product availability, market penetration, competitive activity, distributor presence and retailer feedback.`;
-    if (excellentOrGood.length > 0) {
-        summary += ` The audit revealed strong penetration for ${excellentOrGood.join(" and ")}.`;
-    }
-    if (zeroProducts.length > 0) {
-        summary += ` However, ${zeroProducts.join(" and ")} recorded no penetration and were not found in any outlet.`;
-    }
-
-    // Outlets with no Excel products at all: frame as positive when the
-    // share is low, as a concern only when it's a meaningful share.
-    if (outletsWithNoProducts.length === 0) {
-        summary += " Every outlet visited stocked at least one Excel product, a positive indicator of overall market presence.";
-    } else if (noProductPct <= 15) {
-        summary += ` Only ${outletsWithNoProducts.length} outlet${outletsWithNoProducts.length === 1 ? "" : "s"} (${noProductPct}%) did not stock any Excel products, a positive indicator of overall market presence.`;
-    } else {
-        summary += ` ${outletsWithNoProducts.length} outlets (${noProductPct}%) visited did not stock any Excel products at all, suggesting missed distribution opportunities.`;
-    }
-    sections.push({ heading: "Executive Summary", type: "paragraph", text: summary });
-
-    // Observations
-    const observations = [];
-    if (outletsWithNoProducts.length > 0 && noProductPct > 15) {
-        observations.push(`${outletsWithNoProducts.length} outlet${outletsWithNoProducts.length === 1 ? "" : "s"} visited did not stock any Excel products.`);
-    }
-    if (lowProducts.length > 0) {
-        observations.push(`${lowProducts.join(", ")} continue to record low market presence.`);
-    }
-    if (promotionNo > promotionYes) {
-        observations.push(`Promotional activity was observed in only ${promotionYes} of ${totalOutlets} outlets visited.`);
-    }
-    if (visitedNo > 0) {
-        observations.push(`Retailers reported that sales representatives had not visited ${visitedNo} of ${totalOutlets} outlets.`);
-    }
-    if (observations.length > 0) {
-        sections.push({ heading: "Observations", type: "bullets", items: observations });
-    }
-
-    // Product Availability & Penetration
-    sections.push({
-        heading: "Product Availability & Penetration",
-        type: "bullets",
-        items: productPenetration.map((p) =>
-            `${p.label} – Available in ${p.count} of ${totalOutlets} outlets (${p.tier})`
-        ),
-    });
-
-    // Competitive Landscape — narrative intro naming the most contested
-    // categories, then distinct competitor names grouped by category
-    // (matching how a manually-written field report presents this),
-    // with any uncategorized "Other" brands folded into a closing sentence.
-    const categoryEntries = competitorTallyByCategory.filter(([catKey]) => catKey !== "other");
-    const otherEntry = competitorTallyByCategory.find(([catKey]) => catKey === "other");
-
-    if (categoryEntries.length === 0 && !otherEntry) {
-        // Nothing recorded — say nothing, rather than calling out the gap.
-    } else {
-        const rankedCategories = [...categoryEntries].sort((a, b) => {
-            const totalA = a[1].reduce((s, [, c]) => s + c, 0);
-            const totalB = b[1].reduce((s, [, c]) => s + c, 0);
-            return totalB - totalA;
-        });
-        const topLabels = rankedCategories.slice(0, 3).map(([catKey]) => COMPETITOR_CATEGORY_LABELS[catKey] || catKey);
-
-        const introParagraphs = [];
-        if (topLabels.length === 1) {
-            introParagraphs.push(`Competition remains strongest in the ${topLabels[0]} category.`);
-        } else if (topLabels.length === 2) {
-            introParagraphs.push(`Competition remains strongest in the ${topLabels[0]} and ${topLabels[1]} categories.`);
-        } else if (topLabels.length >= 3) {
-            introParagraphs.push(`Competition remains strongest in the ${topLabels[0]}, ${topLabels[1]} and ${topLabels[2]} categories.`);
-        }
-        if (categoryEntries.length > 0) {
-            introParagraphs.push("Key competitors observed include:");
+        if (section.type === "paragraph") {
+            lines.push(section.text);
+        } else if (section.type === "bullets") {
+            if (section.text) lines.push(section.text);
+            for (const item of section.items) lines.push(`- ${item}`);
+        } else if (section.type === "grouped-bullets") {
+            for (const p of section.introParagraphs || []) lines.push(p);
+            for (const group of section.groups) {
+                lines.push(`${group.label}:`);
+                for (const item of group.items) lines.push(`- ${item}`);
+            }
+            if (section.outro) lines.push(section.outro);
+        } else if (section.type === "table") {
+            lines.push(section.columns.join(" | "));
+            for (const row of section.rows) lines.push(row.join(" | "));
         }
 
-        const groups = categoryEntries
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([catKey, names]) => ({
-                label: COMPETITOR_CATEGORY_LABELS[catKey] || catKey,
-                items: names.map(([name]) => name),
-            }));
-
-        sections.push({
-            heading: "Competitive Landscape",
-            type: "grouped-bullets",
-            introParagraphs,
-            groups,
-            outro: otherEntry
-                ? `Other notable competing brands observed include ${otherEntry[1].map(([name]) => name).join(", ")}.`
-                : undefined,
-        });
+        lines.push("");
     }
 
-    // Distributor Activity — omitted entirely if nothing was recorded,
-    // rather than calling out the gap
-    if (distributorTally.length > 0) {
-        sections.push({
-            heading: "Distributor Activity",
-            type: "bullets",
-            items: distributorTally.map(([name, count]) => `${name} — supplying ${count} of ${totalOutlets} outlets visited`),
-        });
-    }
-
-    // Promotional Activity — only shown if at least one outlet actually
-    // has a recorded answer either way
-    if (promotionYes > 0 || promotionNo > 0) {
-        const promoParts = [];
-        if (promotionYes > 0) promoParts.push(`Promotional activity was observed in ${promotionYes} of ${totalOutlets} outlets.`);
-        if (promotionNo > 0) promoParts.push(`No promotional activity was observed in ${promotionNo} outlets.`);
-        sections.push({
-            heading: "Promotional Activity",
-            type: "paragraph",
-            text: promoParts.join(" "),
-        });
-    }
-
-    // Retailer Feedback — grouped into themes, not listed individually
-    if (feedback.length > 0) {
-        const { themeLines, unmatched } = groupFeedbackThemes(feedback);
-        const items = [...themeLines];
-
-        if (unmatched.length > 0) {
-            items.push(...unmatched);
-        }
-
-        if (items.length > 0) {
-            sections.push({ heading: "Retailer Feedback", type: "bullets", items });
-        }
-    }
-
-    // Recommendations
-    const recommendations = [];
-    if (lowProducts.length > 0 || zeroProducts.length > 0) {
-        recommendations.push(`Increase distribution of low-penetration products including ${[...zeroProducts, ...lowProducts].join(", ")}.`);
-    }
-    if (outletsWithNoProducts.length > 0 && noProductPct > 15) {
-        recommendations.push("Follow up on outlets currently stocking no Excel products to identify and remove barriers to listing.");
-    }
-    if (promotionNo > promotionYes) {
-        recommendations.push("Introduce promotional activities and point-of-sale materials to improve product visibility.");
-    }
-    recommendations.push("Continue monitoring route execution through regular field audits to ensure balanced market coverage.");
-    sections.push({ heading: "Recommendations", type: "bullets", items: recommendations });
-
-    return sections;
+    return lines.join("\n").trim();
 }
+
+export { formatReportDate };

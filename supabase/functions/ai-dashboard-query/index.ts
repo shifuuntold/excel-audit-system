@@ -204,13 +204,18 @@ async function handleFullReport(reportData?: ReportFindingsInput) {
 
   const prompt = buildReportFindingsPrompt(reportData);
   const text = await callGemini(GEMINI_API_KEY!, prompt);
-  const findings = extractJson<{ key_observations: string[]; recommendations: string[] }>(text);
+  const findings = extractJson<{
+    key_observations: string[];
+    retailer_feedback: string[];
+    recommendations: string[];
+  }>(text);
 
   return Response.json(
     {
       success: true,
       mode: "full_report",
       key_observations: findings.key_observations || [],
+      retailer_feedback: findings.retailer_feedback || [],
       recommendations: findings.recommendations || [],
     },
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }

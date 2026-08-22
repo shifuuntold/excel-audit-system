@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { canViewAllAudits } from "../utils/roles";
 import { getAudits } from "../services/auditHistoryService";
 import { getAreas, getAreaMap, resolveAreaName } from "../services/areaService";
-import { buildReportData, generateAiReportSections, formatReportDate } from "../services/reportService";
+import { buildReportData, generateAiReportSections, formatReportDate, formatReportAsText } from "../services/reportService";
 import { localIsoDate as isoDate } from "../utils/format";
+import { speakText, stopSpeaking } from "../utils/speech";
 import { supabase } from "../lib/supabase";
 
 import Header from "../components/layout/Header";
@@ -16,7 +17,13 @@ import Input from "../components/common/Input";
 import Select from "../components/common/Select";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
-import { Sparkles, Download } from "lucide-react";
+import { Sparkles, Download, Copy, Check, Volume2, VolumeX } from "lucide-react";
+
+const reportActionBtnStyle = {
+    display: "flex", alignItems: "center", justifyContent: "center",
+    width: 26, height: 26, borderRadius: 8, border: 0,
+    background: "transparent", color: B.muted, cursor: "pointer",
+};
 
 export default function Reports() {
     const { user, profile } = useAuth();
@@ -35,6 +42,14 @@ export default function Reports() {
     const [report, setReport] = useState(null); // { sections, generatedFor }
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(null);
+    const [speaking, setSpeaking] = useState(false);
+    const [copied, setCopied] = useState(false);
+    const speechController = useRef(null);
+
+    // Stops the report from continuing to talk in the background after
+    // navigating away from this page — there's no visible Stop control
+    // left once the page unmounts.
+    useEffect(() => () => stopSpeaking(), []);
 
     useEffect(() => {
         getAreas().then(setAreas).catch(console.error);
@@ -88,6 +103,9 @@ export default function Reports() {
     const reportStale = report && (report.generatedFor.startDate !== startDate || report.generatedFor.endDate !== endDate || report.generatedFor.areaId !== areaId);
 
     async function generateReport() {
+        speechController.current?.stop();
+        speechController.current = null;
+        setSpeaking(false);
         setAiLoading(true);
         setAiError(null);
         try {
@@ -111,7 +129,7 @@ export default function Reports() {
                         promotionYes: reportData.promotionYes,
                         promotionNo: reportData.promotionNo,
                         visitedNo: reportData.visitedNo,
-                        feedbackThemes: reportData.feedback.slice(0, 30),
+                        rawFeedback: reportData.feedback.slice(0, 30),
                     },
                 },
             });
@@ -121,6 +139,7 @@ export default function Reports() {
 
             const sections = generateAiReportSections(reportData, { areaLabel, startDate, endDate }, {
                 keyObservations: data.key_observations,
+                retailerFeedback: data.retailer_feedback,
                 recommendations: data.recommendations,
             });
 
@@ -147,6 +166,37 @@ export default function Reports() {
         } finally {
             setDownloading(false);
         }
+    }
+
+    async function handleCopy() {
+        if (!report) return;
+        const text = formatReportAsText(report.sections, { areaLabel, dateLabel: reportDateLabel, totalOutlets: reportData.totalOutlets });
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error("Copy failed:", err);
+        }
+    }
+
+    function toggleReadAloud() {
+        if (speaking) {
+            speechController.current?.stop();
+            speechController.current = null;
+            setSpeaking(false);
+            return;
+        }
+        if (!report) return;
+        const text = formatReportAsText(report.sections, { areaLabel, dateLabel: reportDateLabel, totalOutlets: reportData.totalOutlets });
+        setSpeaking(true);
+        speechController.current = speakText(text, {
+            onEnd: () => setSpeaking(false),
+            onError: (err) => {
+                console.error("Read aloud failed:", err);
+                setSpeaking(false);
+            },
+        });
     }
 
     return (
@@ -217,10 +267,20 @@ export default function Reports() {
                         <h1 style={{ fontSize: 17, fontWeight: 800, color: B.blue, letterSpacing: 0.3, marginBottom: 14 }}>
                             FIELD SALES AUDITOR REPORT
                         </h1>
-                        <div style={{ fontSize: 13, color: B.text, lineHeight: 1.9, marginBottom: 22 }}>
+                        <div style={{ fontSize: 13, color: B.text, lineHeight: 1.9, marginBottom: 4 }}>
                             <div><strong>Area:</strong> {areaLabel}</div>
                             <div><strong>Date:</strong> {reportDateLabel}</div>
                             <div><strong>Total Outlets Covered:</strong> {reportData.totalOutlets}</div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 2, marginBottom: 18 }}>
+                            <button onClick={handleCopy} title="Copy report" style={reportActionBtnStyle}>
+                                {copied ? <Check size={14} style={{ color: B.green }} /> : <Copy size={13} />}
+                            </button>
+                            <button onClick={toggleReadAloud} title={speaking ? "Stop" : "Read aloud"} style={reportActionBtnStyle}>
+                                {speaking ? <VolumeX size={14} style={{ color: B.blue }} /> : <Volume2 size={13} />}
+                            </button>
+                            {copied && <span style={{ fontSize: 11, color: B.green, fontWeight: 600, marginLeft: 2 }}>Copied!</span>}
                         </div>
 
                         <ReportSections sections={report.sections} />
