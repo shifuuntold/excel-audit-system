@@ -197,15 +197,28 @@ export default function NewAudit() {
             const payload = { userId: user.id, outlet, products: audit.products, market: audit.market };
 
             if (!navigator.onLine) {
-                queueAudit(payload);
+                const queued = queueAudit(payload);
+                if (!queued) {
+                    // The one outcome that must never look like success:
+                    // offline, AND the local save itself failed (storage
+                    // full or blocked). The draft is left untouched so the
+                    // audit isn't lost — there's nowhere else it could be.
+                    alert("We couldn't save this audit on your device — it may be low on storage. Please free up some space and try again; your answers are still here.");
+                    return;
+                }
                 alert("You're offline, so this audit has been saved on your device. It'll sync automatically once you're back online.");
             } else {
                 try {
                     await saveAudit(payload);
                     alert("Audit submitted. Thanks for getting this one done.");
-                } catch {
+                } catch (saveError) {
                     // Save failed (likely a flaky connection) — don't lose the data
-                    queueAudit(payload);
+                    console.error("Online submit failed, falling back to offline queue:", saveError);
+                    const queued = queueAudit(payload);
+                    if (!queued) {
+                        alert("We couldn't reach the server, and couldn't save this audit on your device either — it may be low on storage. Please free up some space and try again; your answers are still here.");
+                        return;
+                    }
                     alert("We couldn't reach the server, so this audit has been saved on your device. It'll sync automatically once the connection is back.");
                 }
             }

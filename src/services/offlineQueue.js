@@ -6,16 +6,31 @@ function readQueue() {
     try {
         const raw = localStorage.getItem(QUEUE_KEY);
         return raw ? JSON.parse(raw) : [];
-    } catch {
+    } catch (error) {
+        console.error("Failed to read the offline audit queue from storage:", error);
         return [];
     }
 }
 
 function writeQueue(queue) {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-    window.dispatchEvent(new CustomEvent("offline-queue-changed"));
+    try {
+        localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+        window.dispatchEvent(new CustomEvent("offline-queue-changed"));
+        return true;
+    } catch (error) {
+        // Storage quota exceeded, private-browsing restrictions, etc. This
+        // is the one failure mode that must never happen silently: it's
+        // the moment we're specifically trying to protect an audit from
+        // being lost while offline, so the caller needs to know the save
+        // didn't actually happen rather than assuming it did.
+        console.error("Failed to write the offline audit queue to storage:", error);
+        return false;
+    }
 }
 
+/** Returns true if the audit was actually queued, false if local storage
+ * itself failed to accept it — the one case a caller must not treat as
+ * "saved for later" (see writeQueue's comment). */
 export function queueAudit(payload) {
     const queue = readQueue();
     queue.push({
@@ -23,7 +38,7 @@ export function queueAudit(payload) {
         queuedAt: new Date().toISOString(),
         payload,
     });
-    writeQueue(queue);
+    return writeQueue(queue);
 }
 
 export function getQueuedAudits() {
