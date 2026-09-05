@@ -12,7 +12,8 @@ export function readCache(key, fallback = null) {
     try {
         const raw = localStorage.getItem(PREFIX + key);
         return raw ? JSON.parse(raw) : fallback;
-    } catch {
+    } catch (error) {
+        console.error(`Failed to read offline cache for "${key}":`, error);
         return fallback;
     }
 }
@@ -20,8 +21,9 @@ export function readCache(key, fallback = null) {
 export function writeCache(key, value) {
     try {
         localStorage.setItem(PREFIX + key, JSON.stringify(value));
-    } catch {
+    } catch (error) {
         // storage full/unavailable — non-fatal, just means no offline cache
+        console.error(`Failed to write offline cache for "${key}":`, error);
     }
 }
 

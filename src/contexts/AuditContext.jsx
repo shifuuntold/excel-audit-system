@@ -8,7 +8,8 @@ function readDraft(key) {
     try {
         const raw = localStorage.getItem(STORAGE_PREFIX + key);
         return raw ? JSON.parse(raw) : null;
-    } catch {
+    } catch (error) {
+        console.error("Failed to read the saved audit draft:", error);
         return null;
     }
 }
@@ -16,16 +17,20 @@ function readDraft(key) {
 function writeDraft(key, audit) {
     try {
         localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(audit));
-    } catch {
-        // storage full/unavailable — non-fatal, just means no refresh protection
+    } catch (error) {
+        // storage full/unavailable — non-fatal, just means no refresh
+        // protection for this draft. Logged so a support conversation
+        // about "my in-progress audit disappeared on refresh" has
+        // somewhere to start.
+        console.error("Failed to save the audit draft (refresh protection unavailable):", error);
     }
 }
 
 function clearDraftStorage(key) {
     try {
         localStorage.removeItem(STORAGE_PREFIX + key);
-    } catch {
-        // ignore
+    } catch (error) {
+        console.error("Failed to clear the saved audit draft:", error);
     }
 }
 
