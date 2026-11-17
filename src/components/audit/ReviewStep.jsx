@@ -48,6 +48,7 @@ export default function ReviewStep() {
                         <Field label="Person Met" value={audit.person_met} />
                         <Field label="Position" value={audit.position} />
                         <Field label="Mobile" value={audit.mobile} />
+                        <Field label="Outlet record" value={audit.outlet_id ? "Linked to a registered outlet" : "New outlet (registered on submit)"} />
                         {audit.latitude && audit.longitude && (
                             <Field
                                 label="GPS Location"

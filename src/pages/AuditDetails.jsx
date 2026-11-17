@@ -16,6 +16,7 @@ import PageContainer from "../components/layout/PageContainer";
 import { SkeletonAuditDetails, SkeletonBlock } from "../components/common/Skeleton";
 import Button from "../components/common/Button";
 import { B } from "../config/theme";
+import { LOCATION_STATUS_META } from "../utils/location";
 import { FileText, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 
 function Field({ label, value }) {
@@ -222,6 +223,12 @@ export default function AuditDetails() {
                         <Field label="Person Met" value={audit.outlet?.person_met} />
                         <Field label="Position" value={audit.outlet?.position} />
                         <Field label="Mobile" value={audit.outlet?.mobile} />
+                        {audit.location_status && LOCATION_STATUS_META[audit.location_status] && (
+                            <Field
+                                label="Location check"
+                                value={`${LOCATION_STATUS_META[audit.location_status].label}${audit.location_distance_m != null ? ` (${Math.round(Number(audit.location_distance_m))} m from registered location, allowed ${audit.location_radius_m} m)` : ""}`}
+                            />
+                        )}
                         {audit.outlet?.latitude && (
                             <Field label="GPS" value={`${audit.outlet.latitude}, ${audit.outlet.longitude}`} />
                         )}

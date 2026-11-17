@@ -118,5 +118,9 @@ async function resolveAreaIfNeeded(payload) {
             area_id: area.id,
             area_name: area.name,
         },
+        // keep the outlet registration in step with the resolved area
+        ...(payload.outletRef
+            ? { outletRef: { ...payload.outletRef, area_id: area.id, area_name: area.name } }
+            : {}),
     };
 }

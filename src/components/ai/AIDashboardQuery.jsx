@@ -412,6 +412,33 @@ function FlagsList({ flags }) {
     );
 }
 
+/** The figures behind an answer, taken from the database rather than written by the model. */
+function EvidenceList({ evidence, verification }) {
+    const withheld = verification?.status?.startsWith("withheld");
+    if (!withheld && (!evidence || evidence.length === 0)) return null;
+    return (
+        <div>
+            {withheld && (
+                <p style={{ margin: "0 0 8px", fontSize: 12, color: "#B45309", lineHeight: 1.5 }}>
+                    A written explanation could not be checked against the audit data, so only the calculated findings are shown.
+                </p>
+            )}
+            {evidence?.length > 0 && (
+                <details>
+                    <summary style={{ fontSize: 11.5, fontWeight: 700, color: B.muted, cursor: "pointer", letterSpacing: 0.3 }}>
+                        EVIDENCE ({evidence.length})
+                    </summary>
+                    <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+                        {evidence.map((e, i) => (
+                            <li key={i} style={{ fontSize: 12, color: B.muted, lineHeight: 1.5 }}>{e.text}</li>
+                        ))}
+                    </ul>
+                </details>
+            )}
+        </div>
+    );
+}
+
 function MessageThread({ message, dateRange, onRegenerate, onFeedback, speaking, onToggleReadAloud }) {
     if (message.isBrief) return <BriefCard message={message} dateRange={dateRange} />;
 
@@ -446,6 +473,8 @@ function MessageThread({ message, dateRange, onRegenerate, onFeedback, speaking,
                     )}
 
                     <FlagsList flags={message.result.flags} />
+
+                    <EvidenceList evidence={message.result.evidence} verification={message.result.verification} />
 
                     {message.result.recommended_action && (
                         <div style={{ background: B.blueFaint, border: `1px solid ${B.blueLight}`, borderRadius: 10, padding: 14 }}>
@@ -589,6 +618,30 @@ function BriefCard({ message, dateRange }) {
                                 ))}
                             </ul>
                         </div>
+                    )}
+
+                    {message.brief.significant_changes?.length > 0 && (
+                        <div>
+                            <SectionLabel>Changes vs previous period</SectionLabel>
+                            <ul style={{ margin: "5px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+                                {message.brief.significant_changes.map((c, i) => (
+                                    <li key={i} style={{ fontSize: 12.5, color: B.text, lineHeight: 1.5 }}>{c}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {message.brief.key_findings?.length > 0 && (
+                        <details>
+                            <summary style={{ fontSize: 11.5, fontWeight: 700, color: B.muted, cursor: "pointer", letterSpacing: 0.3 }}>
+                                SUPPORTING EVIDENCE ({message.brief.key_findings.length})
+                            </summary>
+                            <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+                                {message.brief.key_findings.map((f, i) => (
+                                    <li key={i} style={{ fontSize: 12, color: B.muted, lineHeight: 1.5 }}>{f.evidence}</li>
+                                ))}
+                            </ul>
+                        </details>
                     )}
 
                     {message.brief.recommended_actions?.length > 0 && (

@@ -1,4 +1,5 @@
 import { saveAudit, getAuditById, updateAudit } from "../services/auditService";
+import { newOutletId } from "../utils/outlets";
 import { queueAudit } from "../services/offlineQueue";
 import { useAuth } from "../hooks/useAuth";
 import { useAudit } from "../hooks/useAudit";
@@ -64,6 +65,7 @@ export default function NewAudit() {
                     beginDraft(key, {
                         ...BLANK_AUDIT,
                         ...existing.outlet,
+                        outlet_id: existing.outlet_id || null,
                         products: existing.products || {},
                         market: existing.market || {},
                     });
@@ -174,6 +176,22 @@ export default function NewAudit() {
             longitude: audit.longitude,
         };
 
+        // How this audit is tied to a registered outlet. A device-generated id
+        // lets a brand-new outlet be created offline and synced later.
+        const hasCapture = audit.latitude != null && audit.longitude != null;
+        const outletRef = {
+            id: audit.outlet_id || newOutletId(),
+            isNew: !audit.outlet_id,
+            name: audit.shop_name,
+            area_id: audit.area_id,
+            area_name: audit.area_name,
+            latitude: hasCapture ? audit.latitude : null,
+            longitude: hasCapture ? audit.longitude : null,
+        };
+        const capture = hasCapture
+            ? { latitude: audit.latitude, longitude: audit.longitude, accuracy: audit.captured_accuracy_m ?? null }
+            : null;
+
         try {
             if (editId) {
                 // Edits need a live connection — updating a record offline
@@ -183,7 +201,7 @@ export default function NewAudit() {
                     setSubmitting(false);
                     return;
                 }
-                await updateAudit(editId, { outlet, products: audit.products, market: audit.market });
+                await updateAudit(editId, { outlet, products: audit.products, market: audit.market, outletRef: audit.outlet_id ? null : outletRef });
                 alert("Your changes have been saved.");
                 clearDraft();
                 // replace (not push): the edit form shouldn't linger in
@@ -194,7 +212,7 @@ export default function NewAudit() {
                 return;
             }
 
-            const payload = { userId: user.id, outlet, products: audit.products, market: audit.market };
+            const payload = { userId: user.id, outlet, products: audit.products, market: audit.market, outletRef, capture };
 
             if (!navigator.onLine) {
                 const queued = queueAudit(payload);

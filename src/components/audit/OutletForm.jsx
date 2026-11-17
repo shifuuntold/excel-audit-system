@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAudit } from "../../hooks/useAudit";
 import { POSITIONS } from "../../config/productCatalog";
 
@@ -9,6 +9,9 @@ import Select from "../common/Select";
 import Button from "../common/Button";
 import Label from "../common/Label";
 import LocationSearch from "./LocationSearch";
+import OutletPicker from "./OutletPicker";
+import { getOutlets, getLocationSettings } from "../../services/outletService";
+import { describeLocationResult, evaluateLocation } from "../../utils/location";
 import { B } from "../../config/theme";
 import { LocateFixed, CheckCircle2, AlertCircle, Building2 } from "lucide-react";
 
@@ -18,6 +21,26 @@ export default function OutletForm() {
 
     const [locating, setLocating] = useState(false);
     const [locationError, setLocationError] = useState("");
+    const [outlets, setOutlets] = useState([]);
+    const [settings, setSettings] = useState(null);
+
+    useEffect(() => {
+        getOutlets().then(setOutlets).catch(() => {});
+        getLocationSettings().then(setSettings).catch(() => {});
+    }, []);
+
+    // Preview only: the database computes the authoritative result on save.
+    const linkedOutlet = audit.outlet_id ? outlets.find((o) => o.id === audit.outlet_id) : null;
+    const preview = audit.latitude && audit.longitude
+        ? describeLocationResult(
+            audit.outlet_id
+                ? evaluateLocation({
+                    capturedLat: audit.latitude, capturedLon: audit.longitude, accuracy: audit.captured_accuracy_m,
+                    outletLat: linkedOutlet?.latitude, outletLon: linkedOutlet?.longitude,
+                }, settings || undefined)
+                : { status: "baseline_set", distance_m: null },
+        )
+        : null;
 
     function updateField(field, value) {
         setAudit({
@@ -41,6 +64,7 @@ export default function OutletForm() {
                     ...prev,
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
+                    captured_accuracy_m: position.coords.accuracy ?? null,
                 }));
                 setLocating(false);
             },
@@ -69,13 +93,7 @@ export default function OutletForm() {
 
             <div style={{ display: "grid", gap: 4 }}>
 
-                <Input
-                    label="Shop Name"
-                    required
-                    value={audit.shop_name || ""}
-                    onChange={(e) => updateField("shop_name", e.target.value)}
-                    placeholder="e.g. Kim's General Store"
-                />
+                <OutletPicker audit={audit} setAudit={setAudit} />
 
                 <LocationSearch
                     required
@@ -162,6 +180,13 @@ export default function OutletForm() {
                                 {locating ? "Getting location..." : "Capture GPS Location"}
                             </Button>
                         </div>
+                    )}
+
+                    {preview && (
+                        <p style={{ fontSize: 12, marginTop: 8, color: preview.tone === "warn" ? "#B45309" : B.muted, lineHeight: 1.45 }}>
+                            {audit.outlet_id ? preview.text : "This location will be registered as the new outlet's location."}
+                            {audit.outlet_id && preview.tone === "warn" ? " You can still submit; the audit will be flagged for review." : ""}
+                        </p>
                     )}
 
                     {locationError && (
