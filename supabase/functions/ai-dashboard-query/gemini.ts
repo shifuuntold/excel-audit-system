@@ -50,24 +50,44 @@ export async function callGemini(apiKey: string, prompt: string): Promise<string
  * extracts the first balanced {...} block, which is far more robust to
  * whatever formatting Gemini decides to wrap the JSON in.
  */
-export function extractJson<T = unknown>(text: string): T {
+export function extractJson<T = unknown>(text: string, validate?: (value: unknown) => value is T): T {
   let cleaned = text.trim();
 
   // Strip a markdown code fence if present (```json ... ``` or ``` ... ```)
   cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
 
-  // If there's still leading/trailing prose around the JSON, grab the
-  // first balanced {...} block rather than assuming the whole string is JSON.
+  // If there is still prose around the JSON, take the first {...} block.
   const firstBrace = cleaned.indexOf("{");
   const lastBrace = cleaned.lastIndexOf("}");
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
     cleaned = cleaned.slice(firstBrace, lastBrace + 1);
   }
 
+  let parsed: unknown;
   try {
-    return JSON.parse(cleaned) as T;
+    parsed = JSON.parse(cleaned);
   } catch {
-    console.error("Failed to parse Gemini JSON output:", cleaned);
+    console.error("Failed to parse Gemini JSON output:", cleaned.slice(0, 500));
     throw new Error("The AI returned a response we couldn't parse. Please try rephrasing your question.");
   }
+
+  // Valid JSON can still have the wrong shape; callers pass a guard for the
+  // shape they expect so a malformed reply fails here, not in the UI.
+  if (validate && !validate(parsed)) {
+    console.error("Gemini JSON output failed shape validation:", cleaned.slice(0, 500));
+    throw new Error("The AI returned a response in an unexpected format. Please try rephrasing your question.");
+  }
+  return parsed as T;
+}
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === "string");
+}
+
+export function isReportFindingsShape(v: unknown): v is {
+  key_observations: string[]; retailer_feedback: string[]; recommendations: string[];
+} {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return isStringArray(o.key_observations ?? []) && isStringArray(o.retailer_feedback ?? []) && isStringArray(o.recommendations ?? []);
 }
